@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+    <body onload="startGame()" >
+        <script>
+var myGame = {
+    canvas : document.createElement("canvas"),
+    start : function() {
+        this.canvas.width = 800;
+        this.canvas.height = 600;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+    },
+    clear : function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+}
+
+function drawGame() {
+    var ctx = myGame.canvas.getContext("2d");
+    ctx.fillStyle = "#F00";
+    ctx.fillRect(myGame.p.x, myGame.p.y, 3, 8);
+    ctx.font = "30px Arial";
+    ctx.fillStyle = "#0f0";
+    ctx.textAlign = "center";
+    ctx.fillText("Hello World!", myGame.canvas.width/2, myGame.canvas.height/2);
+}
+
+const UP = 30, DOWN = 40, LEFT = 37, RIGHT = 39;
+function userkey(e) {
+    e = e || window.event;
+    var p = myGame.p;
+    if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
+        p.y--;
+    } else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
+        p.y++;
+    } else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
+        p.x--;
+    } else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
+        p.x++;
+    } else {
+        console.log("key: "+e.keyCode)
+    }
+};
+
+function startGame() {
+    myGame.start();
+    var p = {x:100, y:50}
+    myGame.p = p;
+	myGame.clear();
+    document.onkeydown = function (e){
+        userkey(e);
+        drawGame();
+    }
+    drawGame();
+}
+// questions:
+// * why is the red box drawing a trail? what could we do to remove the trail?
+// * how could we make this a tile-based game, where the player moves from one square to the next, instead of moving from one pixel to the next?
+        </script>
+    </body>
+</html>

@@ -1,0 +1,256 @@
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            .icon{position:absolute;left:0px;top:0px;}
+            .bottomUI{position:fixed;left:0px;bottom:0px;width:100%;height:40px;}
+        </style>
+    </head>
+    <body onload="startGame()" >
+        <script>
+var squareWidthPixels = 32, squareHeightPixels = 32;
+var iconOffsetX = 8, iconOffsetY = 8;
+var mazeWidthTiles = 16, mazeHeightTiles = 12;
+
+var mazeDataString =
+"################"+
+"#S   k#k #     #"+
+"# ######d#k## ##"+
+"# #    d ###   #"+
+"# # ## #  k# # #"+
+"# #dk# # ### # #"+
+"#   ## ###   # #"+
+"##d# #   #d### #"+
+"#  # ###   #   #"+
+"# ##   #####d###"+
+"#    #    k#  G#"+
+"################";
+
+const MazeTileColors = {
+    '#': '#000',
+    'S': '#ddd',
+    'G': '#0F0',
+    'd': '#883',
+    'k': '#fed',
+    undefined: '#fff'
+};
+
+function drawGame() {
+    var ctx = myGame.canvas.getContext("2d");
+    drawGameTiles(ctx);
+    drawPlayerTile(ctx);
+    if(myGame.winner) {
+        drawWinMessage(ctx, "Winner!", "#0f0");
+    }
+}
+
+function drawGameTiles(ctx) {
+    var col = 0, row = 0;
+    for (row = 0; row < mazeHeightTiles; row++) {
+        for (col = 0; col < mazeWidthTiles; col++) {
+            drawMapTile(ctx, col, row);
+        }
+    }
+}
+
+function drawMapTile(ctx, col, row) {
+    var mazeDataStringIndex = row * mazeWidthTiles + col;
+    var pixelX = col * squareWidthPixels, pixelY = row * squareHeightPixels;
+    var mazeTile = mazeDataString[mazeDataStringIndex];
+    var pixelColor = MazeTileColors[mazeTile];
+    if (pixelColor == undefined) {
+        pixelColor = MazeTileColors[undefined];
+    }
+    ctx.fillStyle = pixelColor;
+    ctx.fillRect(pixelX, pixelY, squareWidthPixels, squareHeightPixels);
+}
+
+function drawPlayerTile(ctx) {
+    pixelX = myGame.p.x * squareWidthPixels, pixelY = myGame.p.y * squareHeightPixels;
+    ctx.fillStyle = "#eef";
+    ctx.fillRect(pixelX, pixelY, squareWidthPixels, squareHeightPixels);
+    var picon = byID("player");
+    picon.style.left = pixelX + iconOffsetX + "px";
+    picon.style.top = pixelY + iconOffsetY + "px";
+}
+
+function drawWinMessage(ctx, message, color) {
+    ctx.font = "30px Arial";
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.fillText(message, myGame.canvas.width/2, myGame.canvas.height/2);
+}
+
+const UP = 30, DOWN = 40, LEFT = 37, RIGHT = 39;
+function userkey(e) {
+    e = e || window.event;
+    var p = myGame.p;
+    var oldP = {x:p.x,y:p.y};
+    if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
+        p.y--;
+    } else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
+        p.y++;
+    } else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
+        p.x--;
+    } else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
+        p.x++;
+    } else if (e.keyCode == '\n'.charCodeAt(0) || e.keyCode == '\r'.charCodeAt(0)) {
+        movePlayerToStart();
+    } else {
+        console.log("key: "+e.keyCode)
+    }
+    var playerMazeDataStringIndex = p.y * mazeWidthTiles + p.x;
+    var playerTileFloor = mazeDataString[playerMazeDataStringIndex];
+    if (p.x < 0 || p.x >= mazeWidthTiles || p.y < 0 || p.y >= mazeHeightTiles || playerTileFloor == '#') {
+        p.x = oldP.x;
+        p.y = oldP.y;
+    }
+    // walk into door
+    if(playerTileFloor == 'd') {
+    }
+    // walk into key
+    if(playerTileFloor == 'k') {
+        myGame.keys++;
+        updateKeyCountUI();
+        mazeDataString = strReplace(mazeDataString, p.y*mazeWidthTiles+p.x, ' ');
+        getObjectAt(p.y, p.x).icon.style.visibility='hidden';
+    }
+    if(playerTileFloor == 'G') {
+        myGame.winner = true;
+    }
+}
+
+function walkIntoDoor(playerMazeDataStringIndex) {
+	var p = myGame.p;
+	if(myGame.keys == 0) {
+		p.x = oldP.x; p.y = oldP.y;
+	} else {
+		myGame.keys--;
+		updateKeyCountUI();
+		mazeDataString = strReplace(mazeDataString, playerMazeDataStringIndex, ' ');
+		getObjectAt(p.y, p.x).icon.style.display='none';
+	}
+}
+
+function movePlayerToStart() {
+    var index = maze_data.indexOf('S');
+    var p = {x:index % maze_width, y: parseInt(index/maze_width)}
+    myGame.p = p;
+}
+
+function strReplace(str, index, replacement) {
+    return str.substring(0,index)+replacement+str.substring(index+1);
+}
+
+function startGame() {
+    myGame.start();
+    // put the player at the start
+    var index = mazeDataString.indexOf('S');
+    var p = {x:index%mazeWidthTiles,y:parseInt(index/mazeWidthTiles)}
+    myGame.p = p;
+    myGame.keys = 0;
+    document.onkeydown = function (e){userkey(e);drawGame();}
+    if(objects.length != 0) {
+        removeAllObjects();
+    }
+    loadmazeicons();
+    drawGame();
+    createInventoryUI();
+    updateKeyCountUI();
+}
+
+function byID(id) { return document.getElementById(id); }
+
+var myGame = {
+    canvas : document.createElement("canvas"),
+    start : function() {
+        this.canvas.width = mazeWidthTiles*squareWidthPixels;
+        this.canvas.height = mazeHeightTiles*squareHeightPixels;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        this.frameNo = 0;
+        this.winner = false;
+    },
+    clear : function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+}
+var objects = [];
+function getObjectAt(row, col) {
+    for(var i = 0; i < objects.length; i++) {
+        o = objects[i];
+        if(o && o.row == row && o.col == col) { return o; }
+    }
+    return null;
+}
+function removeAllObjects() {
+    for(var i = 0; i < objects.length; i++) {
+        objects[i].icon.parentNode.removeChild(objects[i].icon);
+    }
+    objects = [];
+    return null;
+}
+function loadmazeicons() {
+    function setSizeCorrectly(itm) {
+        itm.style.width=squareWidthPixels+'px';
+        itm.style.height=squareHeightPixels+'px';
+    }
+    // list of icons in the game
+    goal = byID("goal");
+    door = byID("door");
+    key = byID("key");
+    player = byID("player")
+    setSizeCorrectly(goal);
+    setSizeCorrectly(door);
+    setSizeCorrectly(key);
+    setSizeCorrectly(player);
+    for(row=0;row<mazeHeightTiles;row++) {
+        for(col=0;col<mazeWidthTiles;col++) {
+            index = row*mazeWidthTiles+col;
+            x = col*squareWidthPixels;
+            y = row*squareHeightPixels;
+            icon = null;
+            switch (mazeDataString[index]) {
+                case 'G': icon = goal.cloneNode(true); break;
+                case 'd': icon = door.cloneNode(true); break;
+                case 'k': icon = key.cloneNode(true); break;
+            }
+            if(icon != null) {
+                document.body.appendChild(icon);
+                objects.push({"index":index,"row":row,"col":col,"icon":icon});
+                icon.id += objects.length;
+                icon.style.left=x+iconOffsetX+"px";
+                icon.style.top=y+iconOffsetY+"px";
+                icon.style.display = 'inline';
+            }
+        }
+    }
+    goal.style.display = door.style.display = key.style.display='none';
+}
+var keyCountUI;
+function createInventoryUI() {
+    var uiArea = byID("bottomUI");
+    if(!keyCountUI) {
+        // adding the key UI
+        var icon = byID("key").cloneNode(true);
+        icon.style.display = 'inline'
+        icon.style.position = 'relative';
+        uiArea.appendChild(icon);
+        keyCountUI = document.createElement("span");
+        keyCountUI.style.position = 'relative';
+        uiArea.appendChild(keyCountUI);
+    }
+}
+function updateKeyCountUI() {
+    keyCountUI.innerHTML = "x"+myGame.keys;
+}
+        </script>
+        <!-- list of icons in the game -->
+        <img src="http://codegiraffe.com/htmlgame/player.png" id="player" class="icon">
+        <img src="http://codegiraffe.com/htmlgame/key.png" id="key" class="icon">
+        <img src="http://codegiraffe.com/htmlgame/door.png" id="door" class="icon">
+        <img src="http://codegiraffe.com/htmlgame/goal.png" id="goal" class="icon">
+        <div class="bottomUI" id="bottomUI"></div>
+    </body>
+</html>
