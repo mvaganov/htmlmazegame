@@ -3,11 +3,17 @@
 <html>
     <head>
         <style>
-            .icon{position:absolute;left:0px;top:0px;}
-            .bottomUI{position:fixed;left:0px;bottom:0px;width:100%;height:40px;}
+            .icon {position:absolute; left:0px; top:0px; }
+            .iconToClone { position:absolute; left:0px; top:0px; display:none; }
+            .bottomUI { position:fixed; left:0px; bottom:0px; width:100%; height:40px; }
         </style>
     </head>
-    <body onload="startGame()" >
+    <body onload="startGame()">
+        <img src="http://codegiraffe.com/htmlgame/player.png" id="player" class="iconToClone">
+        <img src="http://codegiraffe.com/htmlgame/key.png" id="key" class="iconToClone">
+        <img src="http://codegiraffe.com/htmlgame/door.png" id="door" class="iconToClone">
+        <img src="http://codegiraffe.com/htmlgame/goal.png" id="goal" class="iconToClone">
+        <div class="bottomUI" id="bottomUI"></div>
         <script>
 var squareWidthPixels = 32, squareHeightPixels = 32;
 var iconOffsetX = 8, iconOffsetY = 8;
@@ -36,10 +42,32 @@ const MazeTileColors = {
     undefined: '#fff'
 };
 
+const MazeTileIcon = {
+    'S' : "player",
+    'G' : "goal",
+    'd' : "door",
+    'k' : "key",
+}
+
+var myGame = {
+    gameObjects : [],
+    player : {},
+    canvas : document.createElement("canvas"),
+    initialize : function() {
+        this.canvas.width = mazeWidthTiles * squareWidthPixels;
+        this.canvas.height = mazeHeightTiles * squareHeightPixels;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+    },
+    clear : function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+}
+
 function drawGame() {
     var ctx = myGame.canvas.getContext("2d");
     drawGameTiles(ctx);
-    drawPlayerTile(ctx);
+    drawGameObjects(ctx);
     if(myGame.winner) {
         drawWinMessage(ctx, "Winner!", "#0f0");
     }
@@ -55,24 +83,57 @@ function drawGameTiles(ctx) {
 }
 
 function drawMapTile(ctx, col, row) {
-    var mazeDataStringIndex = row * mazeWidthTiles + col;
-    var pixelX = col * squareWidthPixels, pixelY = row * squareHeightPixels;
-    var mazeTile = mazeDataString[mazeDataStringIndex];
-    var pixelColor = MazeTileColors[mazeTile];
-    if (pixelColor == undefined) {
-        pixelColor = MazeTileColors[undefined];
+    var mazeTile = getMazeTileAt(col, row);
+    var color = MazeTileColors[mazeTile];
+    if (color == undefined) {
+        color = MazeTileColors[undefined];
     }
-    ctx.fillStyle = pixelColor;
+    drawTileWithColor(ctx, col, row, color);
+}
+
+function drawTileWithColor(ctx, col, row, color) {
+	if (!color) { return; }
+    var pixelX = col * squareWidthPixels;
+    var pixelY = row * squareHeightPixels;
+    ctx.fillStyle = color;
     ctx.fillRect(pixelX, pixelY, squareWidthPixels, squareHeightPixels);
 }
 
-function drawPlayerTile(ctx) {
-    pixelX = myGame.p.x * squareWidthPixels, pixelY = myGame.p.y * squareHeightPixels;
-    ctx.fillStyle = "#eef";
-    ctx.fillRect(pixelX, pixelY, squareWidthPixels, squareHeightPixels);
-    var picon = byID("player");
-    picon.style.left = pixelX + iconOffsetX + "px";
-    picon.style.top = pixelY + iconOffsetY + "px";
+function getMazeTileAt(col, row) {
+    return mazeDataString[mazeDataStringIndex(col, row)];
+}
+
+function setMazeTileAt(col, row, tileCharacter) {
+    mazeDataString = characterReplace(mazeDataString, mazeDataStringIndex(col, row), ' ');
+}
+
+function characterReplace(str, index, replacement) {
+    return str.substring(0, index) + replacement + str.substring(index + 1);
+}
+
+function mazeDataStringIndex(col, row) {
+    return row * mazeWidthTiles + col;
+}
+
+function drawGameObjects(ctx) {
+    for(i = 0; i < myGame.gameObjects.length; ++i) {
+        drawGameObject(ctx, myGame.gameObjects[i]);
+    }
+}
+
+function drawGameObject(ctx, gameObject) {
+    pixelX = gameObject.x * squareWidthPixels;
+    pixelY = gameObject.y * squareHeightPixels;
+    icon = gameObject.icon;
+    icon.style.left = pixelX + iconOffsetX + "px";
+    icon.style.top = pixelY + iconOffsetY + "px";
+    if (isElementVisible(icon)) {
+        drawTileWithColor(ctx, gameObject.x, gameObject.y, gameObject.tileColor);
+    }
+}
+
+function isElementVisible(element) {
+    return element && element.style.display != 'none' && element.style.visibility != 'hidden';
 }
 
 function drawWinMessage(ctx, message, color) {
@@ -82,11 +143,11 @@ function drawWinMessage(ctx, message, color) {
     ctx.fillText(message, myGame.canvas.width/2, myGame.canvas.height/2);
 }
 
-const UP = 30, DOWN = 40, LEFT = 37, RIGHT = 39;
-function userkey(e) {
+const UP = 38, DOWN = 40, LEFT = 37, RIGHT = 39;
+function userKeyInput(e) {
     e = e || window.event;
-    var p = myGame.p;
-    var oldP = {x:p.x,y:p.y};
+    var p = myGame.player;
+    rememberPreviousPosition(p);
     if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
         p.y--;
     } else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
@@ -98,159 +159,194 @@ function userkey(e) {
     } else if (e.keyCode == '\n'.charCodeAt(0) || e.keyCode == '\r'.charCodeAt(0)) {
         movePlayerToStart();
     } else {
-        console.log("key: "+e.keyCode)
+        console.log("key: "+e.keyCode);
     }
-    var playerMazeDataStringIndex = p.y * mazeWidthTiles + p.x;
-    var playerTileFloor = mazeDataString[playerMazeDataStringIndex];
-    if (p.x < 0 || p.x >= mazeWidthTiles || p.y < 0 || p.y >= mazeHeightTiles || playerTileFloor == '#') {
-        p.x = oldP.x;
-        p.y = oldP.y;
+    var playerTileFloor = getMazeTileAt(myGame.player.x, myGame.player.y);
+    if (p.x < 0 || p.x >= mazeWidthTiles || p.y < 0 || p.y >= mazeHeightTiles) {
+        movePlayerBackToPreviousPosition();
     }
-    // walk into door
-    if(playerTileFloor == 'd') {
-    }
-    // walk into key
-    if(playerTileFloor == 'k') {
-        myGame.keys++;
-        updateKeyCountUI();
-        mazeDataString = strReplace(mazeDataString, p.y*mazeWidthTiles+p.x, ' ');
-        getObjectAt(p.y, p.x).icon.style.visibility='hidden';
-    }
-    if(playerTileFloor == 'G') {
-        myGame.winner = true;
+    var tileCollisionFunction = TileCollisionFunctions[playerTileFloor];
+    if (tileCollisionFunction != undefined) {
+        tileCollisionFunction();
     }
 }
 
-function walkIntoDoor(playerMazeDataStringIndex) {
-	var p = myGame.p;
-	if(myGame.keys == 0) {
-		p.x = oldP.x; p.y = oldP.y;
-	} else {
-		myGame.keys--;
-		updateKeyCountUI();
-		mazeDataString = strReplace(mazeDataString, playerMazeDataStringIndex, ' ');
-		getObjectAt(p.y, p.x).icon.style.display='none';
-	}
+function rememberPreviousPosition(position) {
+    myGame.oldPosition = { x : position.x, y : position.y };
+}
+
+const TileCollisionFunctions = {
+    '#' : movePlayerBackToPreviousPosition,
+    'd' : walkIntoDoor,
+    'k' : walkIntoKey,
+    'G' : walkIntoGoal
+}
+
+function movePlayerBackToPreviousPosition() {
+    myGame.player.x = myGame.oldPosition.x;
+    myGame.player.y = myGame.oldPosition.y;
+}
+
+function walkIntoDoor() {
+    if(myGame.keys <= 0) {
+        movePlayerBackToPreviousPosition();
+    } else {
+        myGame.keys--;
+        updateKeyCountUI();
+        openDoor(myGame.player.x, myGame.player.y);
+    }
+}
+
+function walkIntoKey() {
+    myGame.keys++;
+    updateKeyCountUI();
+	setMazeTileAt(myGame.player.x, myGame.player.y, ' ');
+    getObjectAt(myGame.player.x, myGame.player.y, "key").icon.style.visibility = 'hidden';
+}
+
+function walkIntoGoal() {
+    myGame.winner = true;
+}
+
+function openDoor(col, row) {
+	setMazeTileAt(col, row, ' ');
+    getObjectAt(col, row, "door").icon.style.display = 'none';
+}
+
+function getObjectAt(col, row, name) {
+    for(var i = 0; i < myGame.gameObjects.length; i++) {
+        gameObject = myGame.gameObjects[i];
+        if(gameObject && gameObject.y == row && gameObject.x == col && gameObject.name == name) {
+            return gameObject;
+        }
+    }
+    return null;
 }
 
 function movePlayerToStart() {
-    var index = maze_data.indexOf('S');
-    var p = {x:index % maze_width, y: parseInt(index/maze_width)}
-    myGame.p = p;
-}
-
-function strReplace(str, index, replacement) {
-    return str.substring(0,index)+replacement+str.substring(index+1);
+    var index = mazeDataString.indexOf('S');
+    myGame.player.x = index % mazeWidthTiles;
+    myGame.player.y = parseInt(index / mazeWidthTiles);
 }
 
 function startGame() {
-    myGame.start();
-    // put the player at the start
-    var index = mazeDataString.indexOf('S');
-    var p = {x:index%mazeWidthTiles,y:parseInt(index/mazeWidthTiles)}
-    myGame.p = p;
+    myGame.initialize();
     myGame.keys = 0;
-    document.onkeydown = function (e){userkey(e);drawGame();}
-    if(objects.length != 0) {
+    document.onkeydown = function (e) {
+        userKeyInput(e);
+        drawGame();
+    }
+    if(myGame.gameObjects.length != 0) {
         removeAllObjects();
     }
-    loadmazeicons();
-    drawGame();
+    createTileIconObjects();
+	setupPlayer();
     createInventoryUI();
     updateKeyCountUI();
+    movePlayerToStart();
+    drawGame();
 }
 
-function byID(id) { return document.getElementById(id); }
-
-var myGame = {
-    canvas : document.createElement("canvas"),
-    start : function() {
-        this.canvas.width = mazeWidthTiles*squareWidthPixels;
-        this.canvas.height = mazeHeightTiles*squareHeightPixels;
-        this.context = this.canvas.getContext("2d");
-        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        this.frameNo = 0;
-        this.winner = false;
-    },
-    clear : function() {
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-}
-var objects = [];
-function getObjectAt(row, col) {
-    for(var i = 0; i < objects.length; i++) {
-        o = objects[i];
-        if(o && o.row == row && o.col == col) { return o; }
-    }
-    return null;
-}
-function removeAllObjects() {
-    for(var i = 0; i < objects.length; i++) {
-        objects[i].icon.parentNode.removeChild(objects[i].icon);
-    }
-    objects = [];
-    return null;
-}
-function loadmazeicons() {
-    function setSizeCorrectly(itm) {
-        itm.style.width=squareWidthPixels+'px';
-        itm.style.height=squareHeightPixels+'px';
-    }
-    // list of icons in the game
-    goal = byID("goal");
-    door = byID("door");
-    key = byID("key");
-    player = byID("player")
-    setSizeCorrectly(goal);
-    setSizeCorrectly(door);
-    setSizeCorrectly(key);
-    setSizeCorrectly(player);
-    for(row=0;row<mazeHeightTiles;row++) {
-        for(col=0;col<mazeWidthTiles;col++) {
-            index = row*mazeWidthTiles+col;
-            x = col*squareWidthPixels;
-            y = row*squareHeightPixels;
-            icon = null;
-            switch (mazeDataString[index]) {
-                case 'G': icon = goal.cloneNode(true); break;
-                case 'd': icon = door.cloneNode(true); break;
-                case 'k': icon = key.cloneNode(true); break;
-            }
-            if(icon != null) {
-                document.body.appendChild(icon);
-                objects.push({"index":index,"row":row,"col":col,"icon":icon});
-                icon.id += objects.length;
-                icon.style.left=x+iconOffsetX+"px";
-                icon.style.top=y+iconOffsetY+"px";
-                icon.style.display = 'inline';
-            }
+function createTileIconObjects() {
+    for (row = 0; row < mazeHeightTiles; row++) {
+        for(col = 0; col < mazeWidthTiles; col++) {
+            createTileObject(col, row);
         }
     }
-    goal.style.display = door.style.display = key.style.display='none';
+    hideElements(Object.values(MazeTileIcon));
 }
-var keyCountUI;
-function createInventoryUI() {
-    var uiArea = byID("bottomUI");
-    if(!keyCountUI) {
-        // adding the key UI
-        var icon = byID("key").cloneNode(true);
-        icon.style.display = 'inline'
-        icon.style.position = 'relative';
-        uiArea.appendChild(icon);
-        keyCountUI = document.createElement("span");
-        keyCountUI.style.position = 'relative';
-        uiArea.appendChild(keyCountUI);
+
+function createTileObject(col, row) {
+    mazeTile = getMazeTileAt(col, row);
+    icon = MazeTileIcon[mazeTile];
+    color = MazeTileColors[mazeTile];
+    if(icon != undefined) {
+        createNewTileIconObjectAtLocation(icon, color, col, row);
     }
 }
+
+function createNewTileIconObjectAtLocation(originalIconId, tileColor, col, row) {
+    var originalIconObject = byID(originalIconId);
+    var icon = originalIconObject.cloneNode(true);
+    setIconSizeToMatchTileSize(icon);
+    document.body.appendChild(icon);
+    var gameObject = {
+        x: col, y: row,
+        icon: icon,
+        name: originalIconId,
+        tileColor: tileColor
+    };
+    myGame.gameObjects.push(gameObject);
+    icon.id += myGame.gameObjects.length;
+    pixelX = col * squareWidthPixels;
+    pixelY = row * squareHeightPixels;
+    icon.style.left = pixelX + iconOffsetX + "px";
+    icon.style.top = pixelY + iconOffsetY + "px";
+    icon.style.display = 'inline';
+}
+
+function byID(id) {
+    return document.getElementById(id);
+}
+
+function hideElements(idNames) {
+    for (i = 0; i < idNames.length; i++) {
+        var object = byID(idNames[i]);
+        object.style.display = 'none';
+    }
+}
+
+function setupPlayer() {
+	myGame.player = findGameObject("player");
+}
+
+function findGameObject(name) {
+    for (i = 0; i < myGame.gameObjects.length; i++) {
+        console.log(i + ": " + myGame.gameObjects[i].name);
+        if (myGame.gameObjects[i].name == name) {
+            return myGame.gameObjects[i];
+        }
+    }
+}
+
+function removeAllObjects() {
+    for(var i = 0; i < myGame.gameObjects.length; i++) {
+        o = myGame.gameObjects[i]
+        o.icon.parentNode.removeChild(o.icon);
+    }
+    myGame.gameObjects = [];
+    return null;
+}
+
+function setIconSizeToMatchTileSize(itm) {
+	itm.style.width = squareWidthPixels + 'px';
+	itm.style.height = squareHeightPixels + 'px';
+}
+
+var keyCountUI = null;
+
+function createInventoryUI() {
+    if(keyCountUI != null) {
+        return;
+    }
+    addKeyInventoryUiToDom();
+}
+
+function addKeyInventoryUiToDom() {
+    var uiArea = byID("bottomUI");
+    var icon = byID("key").cloneNode(true);
+    setIconSizeToMatchTileSize(icon);
+    icon.style.display = 'inline'
+    icon.style.position = 'relative';
+    uiArea.appendChild(icon);
+    keyCountUI = document.createElement("span");
+    keyCountUI.style.position = 'relative';
+    uiArea.appendChild(keyCountUI);
+}
+
 function updateKeyCountUI() {
-    keyCountUI.innerHTML = "x"+myGame.keys;
+    keyCountUI.innerHTML = "x" + myGame.keys;
 }
         </script>
-        <!-- list of icons in the game -->
-        <img src="http://codegiraffe.com/htmlgame/player.png" id="player" class="icon">
-        <img src="http://codegiraffe.com/htmlgame/key.png" id="key" class="icon">
-        <img src="http://codegiraffe.com/htmlgame/door.png" id="door" class="icon">
-        <img src="http://codegiraffe.com/htmlgame/goal.png" id="goal" class="icon">
-        <div class="bottomUI" id="bottomUI"></div>
     </body>
 </html>
