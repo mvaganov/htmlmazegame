@@ -103,16 +103,16 @@ function getMazeTileAt(col, row) {
     return mazeDataString[mazeDataStringIndex(col, row)];
 }
 
+function mazeDataStringIndex(col, row) {
+    return row * mazeWidthTiles + col;
+}
+
 function setMazeTileAt(col, row, tileCharacter) {
     mazeDataString = characterReplace(mazeDataString, mazeDataStringIndex(col, row), ' ');
 }
 
 function characterReplace(str, index, replacement) {
     return str.substring(0, index) + replacement + str.substring(index + 1);
-}
-
-function mazeDataStringIndex(col, row) {
-    return row * mazeWidthTiles + col;
 }
 
 function drawGameObjects(ctx) {
