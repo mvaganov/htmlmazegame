@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	<style>
+		body { margin:0; padding:0; }
+	</style>
+	</head>
+<body onload="startGame()" onmousemove="mouseMoveFunction()">
+        <script>
+var APP;
+
+function startGame() {
+	continueApp();
+}
+
+function continueApp() {
+	setTimeout(continueApp, 10);
+	APP.update();
+}
+
+function mouseMoveFunction() {
+	APP.updateMousePosition(window.event);
+}
+
+class Ball {
+	constructor(x, y, radius, dx, dy, strokeColor, fillColor, borderThickness){
+		this.x = x;
+		this.y = y;
+		this.radius = radius;
+		this.dx = dx;
+		this.dy = dy;
+		this.strokeColor = strokeColor;
+		this.fillColor = fillColor;
+		this.borderThickness = borderThickness;
+	}
+	draw(ctx) {
+		ctx.beginPath();
+		if (this.strokeColor) {
+			ctx.strokeStyle = this.strokeColor;
+		}
+		ctx.lineWidth = this.borderThickness;
+		ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+		if (this.fillColor) {
+			ctx.fillStyle = this.fillColor;
+			ctx.fill();
+		}
+		ctx.moveTo(this.x, this.y);
+		ctx.lineTo(this.x + this.dx, this.y + this.dy);
+		ctx.stroke();
+	}
+	update() {
+		let movedX = this.dx * APP.deltaTime / 1000.0;
+		let movedY = this.dy * APP.deltaTime / 1000.0;
+		this.x += movedX;
+		this.y += movedY;
+	}
+	setVelocity(dx, dy) {
+		this.dx = dx;
+		this.dy = dy;
+	}
+};
+
+let ball = new Ball(0, 0, 20, 0, 0, 'black', 'red', 0.25);
+
+class App {
+	constructor() {
+		this.canvas = document.createElement("canvas"),
+		this.ctx = this.canvas.getContext("2d");
+		this.now = Date.now();
+		console.log("creating "+this.now);
+		this.then = Date.now();
+		this.targetFps = 90;
+		this.mouse = {x: 0, y: 0};
+        this.canvas.width = 800;
+        this.canvas.height = 600;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        document.onkeydown = userkey;
+	}
+
+	updateMousePosition(e) {
+		if (!e) {
+			return;
+		}
+		this.mouse.x = e.clientX;
+		this.mouse.y = e.clientY;
+	}
+
+	updateTiming() {
+		this.now = Date.now();
+		let deltaTime = this.now - this.then;
+		if (deltaTime) {
+			this.deltaTime = deltaTime;
+		}
+		this.then = this.now;
+	}
+
+	update() {
+		this.updateTiming();
+		if (!this.deltaTime) { return; }
+		if (this.mouse) {
+			ball.setVelocity(this.mouse.x - ball.x, this.mouse.y - ball.y);
+		}
+		ball.update();
+		this.drawGame();
+	}
+
+	drawGame() {
+		console.log(this.deltaTime < 20);
+		this.ctx = this.canvas.getContext("2d");
+		this.ctx.font = "30px Arial";
+		this.ctx.fillStyle = "#0f0";
+		this.ctx.textAlign = "center";
+		this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
+
+        //this.clear();
+		ball.draw(this.ctx, '#000', 'red', 0.25);
+	}
+
+	clear() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+};
+APP = new App();
+
+const ESCAPE = 27;
+function userkey(e) {
+    e = e || window.event;
+	if (e.keyCode === ESCAPE) {
+		APP.clear();
+	}
+    console.log("key: "+e.keyCode)
+};
+        </script>
+    </body>
+</html>
