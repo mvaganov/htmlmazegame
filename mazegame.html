@@ -1,8 +1,8 @@
-
 <!DOCTYPE html>
 <html>
     <head>
         <style>
+            body { margin:0; padding:0; }
             .icon {position:absolute; left:0px; top:0px; }
             .iconToClone { position:absolute; left:0px; top:0px; display:none; }
             .bottomUI { position:fixed; left:0px; bottom:0px; width:100%; height:40px; }
@@ -15,11 +15,7 @@
         <img src="http://codegiraffe.com/htmlgame/goal.png" id="goal" class="iconToClone">
         <div class="bottomUI" id="bottomUI"></div>
         <script>
-var squareWidthPixels = 32, squareHeightPixels = 32;
-var iconOffsetX = 8, iconOffsetY = 8;
-var mazeWidthTiles = 16, mazeHeightTiles = 12;
-
-var mazeDataString =
+const MazeTilesString =
 "################"+
 "#S   k#k #     #"+
 "# ######d#k## ##"+
@@ -32,6 +28,7 @@ var mazeDataString =
 "# ##   #####d###"+
 "#    #    k#  G#"+
 "################";
+var mazeDataString;
 
 const MazeTileColors = {
     '#': '#000',
@@ -49,23 +46,80 @@ const MazeTileIcon = {
     'k' : "key",
 }
 
-var myGame = {
+const TileCollisionFunctions = {
+    '#' : movePlayerBackToPreviousPosition,
+    'd' : walkIntoDoor,
+    'k' : walkIntoKey,
+    'G' : walkIntoGoal
+}
+
+const ESCAPE = 27, UP = 38, DOWN = 40, LEFT = 37, RIGHT = 39;
+const KeyMapRules = [
+    [UP, ()=>{ translatePlayer(0, -1); }],
+    [LEFT, ()=>{ translatePlayer(-1, 0); }],
+    [DOWN, ()=>{ translatePlayer(0, 1); }],
+    [RIGHT, ()=>{ translatePlayer(1, 0); }],
+    [ESCAPE, ()=>{ startGame(); }],
+    ['\n'.charCodeAt(0), movePlayerToStart],
+    ['\r'.charCodeAt(0), movePlayerToStart],
+    ['W'.charCodeAt(0), ()=>{ translatePlayer(0, -1); }],
+    ['A'.charCodeAt(0), ()=>{ translatePlayer(-1, 0); }],
+    ['S'.charCodeAt(0), ()=>{ translatePlayer(0, 1); }],
+    ['D'.charCodeAt(0), ()=>{ translatePlayer(1, 0); }],
+];
+
+const SquareWidthPixels = 32, SquareHeightPixels = 32;
+const MazeWidthTiles = 16, MazeHeightTiles = 12;
+const IconOffsetX = 8, IconOffsetY = 8;
+
+function startGame() {
+    myGame.initialize();
+}
+
+let myGame = {
     gameObjects : [],
     player : {},
     canvas : document.createElement("canvas"),
     initialize : function() {
-        this.canvas.width = mazeWidthTiles * squareWidthPixels;
-        this.canvas.height = mazeHeightTiles * squareHeightPixels;
+        this.canvas.width = MazeWidthTiles * SquareWidthPixels;
+        this.canvas.height = MazeHeightTiles * SquareHeightPixels;
         this.context = this.canvas.getContext("2d");
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        this.keys = 0;
+        if(myGame.gameObjects.length != 0) {
+            removeAllObjects();
+        }
+        mazeDataString = MazeTilesString;
+        createTileIconObjects();
+        setupPlayer();
+        createInventoryUI();
+        updateKeyCountUI();
+        movePlayerToStart();
+        drawGame();
+        applyKeyMapRules();
+        document.onkeydown = handleKeypress;
     },
     clear : function() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
+};
+
+function applyKeyMapRules() {
+    for (let i = 0; i < KeyMapRules.length; ++i) {
+        key = KeyMapRules[i][0];
+        keyFunction = KeyMapRules[i][1];
+        keyMap[key] = keyFunction;
+    }
+}
+
+function handleKeypress(e) {
+    userKeyInput(e);
+    updateGame();
+    drawGame();
 }
 
 function drawGame() {
-    var ctx = myGame.canvas.getContext("2d");
+    let ctx = myGame.canvas.getContext("2d");
     drawGameTiles(ctx);
     drawGameObjects(ctx);
     if(myGame.winner) {
@@ -74,17 +128,17 @@ function drawGame() {
 }
 
 function drawGameTiles(ctx) {
-    var col = 0, row = 0;
-    for (row = 0; row < mazeHeightTiles; row++) {
-        for (col = 0; col < mazeWidthTiles; col++) {
+    let col = 0, row = 0;
+    for (let row = 0; row < MazeHeightTiles; row++) {
+        for (let col = 0; col < MazeWidthTiles; col++) {
             drawMapTile(ctx, col, row);
         }
     }
 }
 
 function drawMapTile(ctx, col, row) {
-    var mazeTile = getMazeTileAt(col, row);
-    var color = MazeTileColors[mazeTile];
+    let mazeTile = getMazeTileAt(col, row);
+    let color = MazeTileColors[mazeTile];
     if (color == undefined) {
         color = MazeTileColors[undefined];
     }
@@ -92,11 +146,19 @@ function drawMapTile(ctx, col, row) {
 }
 
 function drawTileWithColor(ctx, col, row, color) {
-	if (!color) { return; }
-    var pixelX = col * squareWidthPixels;
-    var pixelY = row * squareHeightPixels;
+    if (!color) {
+        return;
+    }
+    let pixel = pixelLocationOfTile(col, row);
     ctx.fillStyle = color;
-    ctx.fillRect(pixelX, pixelY, squareWidthPixels, squareHeightPixels);
+    ctx.fillRect(pixel.x, pixel.y, SquareWidthPixels, SquareHeightPixels);
+}
+
+function pixelLocationOfTile(col, row) {
+    return {
+        x : col * SquareWidthPixels,
+        y : row * SquareHeightPixels,
+    };
 }
 
 function getMazeTileAt(col, row) {
@@ -104,7 +166,7 @@ function getMazeTileAt(col, row) {
 }
 
 function mazeDataStringIndex(col, row) {
-    return row * mazeWidthTiles + col;
+    return row * MazeWidthTiles + col;
 }
 
 function setMazeTileAt(col, row, tileCharacter) {
@@ -122,14 +184,16 @@ function drawGameObjects(ctx) {
 }
 
 function drawGameObject(ctx, gameObject) {
-    pixelX = gameObject.x * squareWidthPixels;
-    pixelY = gameObject.y * squareHeightPixels;
-    icon = gameObject.icon;
-    icon.style.left = pixelX + iconOffsetX + "px";
-    icon.style.top = pixelY + iconOffsetY + "px";
-    if (isElementVisible(icon)) {
+    let pixelLocation = pixelLocationOfTile(gameObject.x, gameObject.y);
+    moveIconToPixelLocation(gameObject.icon, pixelLocation);
+    if (isElementVisible(gameObject.icon)) {
         drawTileWithColor(ctx, gameObject.x, gameObject.y, gameObject.tileColor);
     }
+}
+
+function moveIconToPixelLocation(icon, pixelLocation) {
+    icon.style.left = pixelLocation.x + "px";
+    icon.style.top = pixelLocation.y + "px";
 }
 
 function isElementVisible(element) {
@@ -143,43 +207,42 @@ function drawWinMessage(ctx, message, color) {
     ctx.fillText(message, myGame.canvas.width/2, myGame.canvas.height/2);
 }
 
-const UP = 38, DOWN = 40, LEFT = 37, RIGHT = 39;
+let keyMap = {};
 function userKeyInput(e) {
     e = e || window.event;
-    var p = myGame.player;
-    rememberPreviousPosition(p);
-    if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
-        p.y--;
-    } else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
-        p.y++;
-    } else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
-        p.x--;
-    } else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
-        p.x++;
-    } else if (e.keyCode == '\n'.charCodeAt(0) || e.keyCode == '\r'.charCodeAt(0)) {
-        movePlayerToStart();
+    keyMapFunction = keyMap[e.keyCode];
+    if (keyMapFunction) {
+        rememberPreviousPosition(myGame.player);
+        keyMapFunction();
     } else {
-        console.log("key: "+e.keyCode);
+        console.log("unknown key: "+e.keyCode);
     }
-    var playerTileFloor = getMazeTileAt(myGame.player.x, myGame.player.y);
-    if (p.x < 0 || p.x >= mazeWidthTiles || p.y < 0 || p.y >= mazeHeightTiles) {
-        movePlayerBackToPreviousPosition();
-    }
-    var tileCollisionFunction = TileCollisionFunctions[playerTileFloor];
-    if (tileCollisionFunction != undefined) {
-        tileCollisionFunction();
-    }
+}
+
+function translatePlayer(deltaX, deltaY) {
+    myGame.oldPosition = {
+        x : myGame.player.x,
+        y : myGame.player.y
+    };
+    myGame.player.x += deltaX;
+    myGame.player.y += deltaY;
 }
 
 function rememberPreviousPosition(position) {
     myGame.oldPosition = { x : position.x, y : position.y };
 }
 
-const TileCollisionFunctions = {
-    '#' : movePlayerBackToPreviousPosition,
-    'd' : walkIntoDoor,
-    'k' : walkIntoKey,
-    'G' : walkIntoGoal
+function updateGame() {
+    let playerX = myGame.player.x;
+    let playerY = myGame.player.y;
+    let playerTileFloor = getMazeTileAt(playerX, playerY);
+    if (playerX < 0 || playerX >= MazeWidthTiles || playerY < 0 || playerY >= MazeHeightTiles) {
+        movePlayerBackToPreviousPosition();
+    }
+    let tileCollisionFunction = TileCollisionFunctions[playerTileFloor];
+    if (tileCollisionFunction != undefined) {
+        tileCollisionFunction();
+    }
 }
 
 function movePlayerBackToPreviousPosition() {
@@ -188,7 +251,7 @@ function movePlayerBackToPreviousPosition() {
 }
 
 function walkIntoDoor() {
-    if(myGame.keys <= 0) {
+    if (myGame.keys <= 0) {
         movePlayerBackToPreviousPosition();
     } else {
         myGame.keys--;
@@ -200,7 +263,7 @@ function walkIntoDoor() {
 function walkIntoKey() {
     myGame.keys++;
     updateKeyCountUI();
-	setMazeTileAt(myGame.player.x, myGame.player.y, ' ');
+    setMazeTileAt(myGame.player.x, myGame.player.y, ' ');
     getObjectAt(myGame.player.x, myGame.player.y, "key").icon.style.visibility = 'hidden';
 }
 
@@ -209,13 +272,13 @@ function walkIntoGoal() {
 }
 
 function openDoor(col, row) {
-	setMazeTileAt(col, row, ' ');
+    setMazeTileAt(col, row, ' ');
     getObjectAt(col, row, "door").icon.style.display = 'none';
 }
 
 function getObjectAt(col, row, name) {
-    for(var i = 0; i < myGame.gameObjects.length; i++) {
-        gameObject = myGame.gameObjects[i];
+    for (let i = 0; i < myGame.gameObjects.length; i++) {
+        let gameObject = myGame.gameObjects[i];
         if(gameObject && gameObject.y == row && gameObject.x == col && gameObject.name == name) {
             return gameObject;
         }
@@ -224,32 +287,14 @@ function getObjectAt(col, row, name) {
 }
 
 function movePlayerToStart() {
-    var index = mazeDataString.indexOf('S');
-    myGame.player.x = index % mazeWidthTiles;
-    myGame.player.y = parseInt(index / mazeWidthTiles);
-}
-
-function startGame() {
-    myGame.initialize();
-    myGame.keys = 0;
-    document.onkeydown = function (e) {
-        userKeyInput(e);
-        drawGame();
-    }
-    if(myGame.gameObjects.length != 0) {
-        removeAllObjects();
-    }
-    createTileIconObjects();
-	setupPlayer();
-    createInventoryUI();
-    updateKeyCountUI();
-    movePlayerToStart();
-    drawGame();
+    let index = mazeDataString.indexOf('S');
+    myGame.player.x = index % MazeWidthTiles;
+    myGame.player.y = parseInt(index / MazeWidthTiles);
 }
 
 function createTileIconObjects() {
-    for (row = 0; row < mazeHeightTiles; row++) {
-        for(col = 0; col < mazeWidthTiles; col++) {
+    for (let row = 0; row < MazeHeightTiles; row++) {
+        for(let col = 0; col < MazeWidthTiles; col++) {
             createTileObject(col, row);
         }
     }
@@ -257,31 +302,30 @@ function createTileIconObjects() {
 }
 
 function createTileObject(col, row) {
-    mazeTile = getMazeTileAt(col, row);
-    icon = MazeTileIcon[mazeTile];
-    color = MazeTileColors[mazeTile];
-    if(icon != undefined) {
+    let mazeTile = getMazeTileAt(col, row);
+    let icon = MazeTileIcon[mazeTile];
+    let color = MazeTileColors[mazeTile];
+    if (icon != undefined) {
         createNewTileIconObjectAtLocation(icon, color, col, row);
     }
 }
 
 function createNewTileIconObjectAtLocation(originalIconId, tileColor, col, row) {
-    var originalIconObject = byID(originalIconId);
-    var icon = originalIconObject.cloneNode(true);
+    let originalIconObject = byID(originalIconId);
+    let icon = originalIconObject.cloneNode(true);
     setIconSizeToMatchTileSize(icon);
     document.body.appendChild(icon);
-    var gameObject = {
-        x: col, y: row,
+    let gameObject = {
+        x: col,
+        y: row,
         icon: icon,
         name: originalIconId,
         tileColor: tileColor
     };
     myGame.gameObjects.push(gameObject);
     icon.id += myGame.gameObjects.length;
-    pixelX = col * squareWidthPixels;
-    pixelY = row * squareHeightPixels;
-    icon.style.left = pixelX + iconOffsetX + "px";
-    icon.style.top = pixelY + iconOffsetY + "px";
+    let pixel = pixelLocationOfTile(col, row);
+    moveIconToPixelLocation(icon, pixel);
     icon.style.display = 'inline';
 }
 
@@ -290,19 +334,18 @@ function byID(id) {
 }
 
 function hideElements(idNames) {
-    for (i = 0; i < idNames.length; i++) {
-        var object = byID(idNames[i]);
+    for (let i = 0; i < idNames.length; i++) {
+        let object = byID(idNames[i]);
         object.style.display = 'none';
     }
 }
 
 function setupPlayer() {
-	myGame.player = findGameObject("player");
+    myGame.player = findGameObject("player");
 }
 
 function findGameObject(name) {
-    for (i = 0; i < myGame.gameObjects.length; i++) {
-        console.log(i + ": " + myGame.gameObjects[i].name);
+    for (let i = 0; i < myGame.gameObjects.length; i++) {
         if (myGame.gameObjects[i].name == name) {
             return myGame.gameObjects[i];
         }
@@ -310,8 +353,8 @@ function findGameObject(name) {
 }
 
 function removeAllObjects() {
-    for(var i = 0; i < myGame.gameObjects.length; i++) {
-        o = myGame.gameObjects[i]
+    for (let i = 0; i < myGame.gameObjects.length; i++) {
+        let o = myGame.gameObjects[i]
         o.icon.parentNode.removeChild(o.icon);
     }
     myGame.gameObjects = [];
@@ -319,22 +362,22 @@ function removeAllObjects() {
 }
 
 function setIconSizeToMatchTileSize(itm) {
-	itm.style.width = squareWidthPixels + 'px';
-	itm.style.height = squareHeightPixels + 'px';
+    itm.style.width = SquareWidthPixels + "px";
+    itm.style.height = SquareHeightPixels + "px";
 }
 
-var keyCountUI = null;
+let keyCountUI = null;
 
 function createInventoryUI() {
-    if(keyCountUI != null) {
+    if (keyCountUI != null) {
         return;
     }
     addKeyInventoryUiToDom();
 }
 
 function addKeyInventoryUiToDom() {
-    var uiArea = byID("bottomUI");
-    var icon = byID("key").cloneNode(true);
+    let uiArea = byID("bottomUI");
+    let icon = byID("key").cloneNode(true);
     setIconSizeToMatchTileSize(icon);
     icon.style.display = 'inline'
     icon.style.position = 'relative';
