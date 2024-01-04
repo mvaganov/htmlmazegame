@@ -1,133 +1,127 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <style>
-            body { margin:0; padding:0; }
-            .icon {position:absolute; left:0px; top:0px; }
-            .iconToClone { position:absolute; left:0px; top:0px; display:none; }
-            .bottomUI { position:fixed; left:0px; bottom:0px; width:100%; height:40px; }
-        </style>
-    </head>
-    <body onload="startGame()">
-        <img src="http://codegiraffe.com/htmlgame/player.png" id="player" class="iconToClone">
-        <img src="http://codegiraffe.com/htmlgame/key.png" id="key" class="iconToClone">
-        <img src="http://codegiraffe.com/htmlgame/door.png" id="door" class="iconToClone">
-        <img src="http://codegiraffe.com/htmlgame/goal.png" id="goal" class="iconToClone">
-        <div class="bottomUI" id="bottomUI"></div>
-        <script>
+	<head>
+		<style>
+			body { margin:0; padding:0; }
+			.icon {position:absolute; left:0px; top:0px; }
+			.iconToClone { position:absolute; left:0px; top:0px; display:none; }
+			.bottomUI { position:fixed; left:0px; bottom:0px; width:100%; height:40px; }
+		</style>
+	</head>
+	<body onload="startGame()">
+		<img src="http://codegiraffe.com/htmlgame/player.png" id="player" class="iconToClone">
+		<img src="http://codegiraffe.com/htmlgame/key.png" id="key" class="iconToClone">
+		<img src="http://codegiraffe.com/htmlgame/door.png" id="door" class="iconToClone">
+		<img src="http://codegiraffe.com/htmlgame/goal.png" id="goal" class="iconToClone">
+		<div class="bottomUI" id="bottomUI"></div>
+		<script>
 const MazeTilesString =
-"################"+
-"#S   k#k #     #"+
-"# ######d#k## ##"+
-"# #    d ###   #"+
-"# # ## #  k# # #"+
-"# #dk# # ### # #"+
-"#   ## ###   # #"+
-"##d# #   #d### #"+
-"#  # ###   #   #"+
-"# ##   #####d###"+
-"#    #    k#  G#"+
-"################";
+	"################"+
+	"#S   k#k #     #"+
+	"# ######d#k## ##"+
+	"# #    d ###   #"+
+	"# # ## #  k# # #"+
+	"# #dk# # ### # #"+
+	"#   ## ###   # #"+
+	"##d# #   #d### #"+
+	"#  # ###   #   #"+
+	"# ##   #####d###"+
+	"#    #    k#  G#"+
+	"################";
+
+const MazeWidthTiles = 16, MazeHeightTiles = 12;
+const TileWidthPixels = 32, TileHeightPixels = 32;
 
 const MazeTileColors = {
-    '#': '#000',
-    'S': '#ddd',
-    'G': '#0F0',
-    'd': '#883',
-    'k': '#fed',
-    undefined: '#fff'
+	'#': '#000',
+	'S': '#ddd',
+	'G': '#0F0',
+	'd': '#883',
+	'k': '#fed',
+	undefined: '#fff'
 };
 
 const MazeTileIcon = {
-    'S' : "player",
-    'G' : "goal",
-    'd' : "door",
-    'k' : "key",
-}
+	'S' : "player",
+	'G' : "goal",
+	'd' : "door",
+	'k' : "key",
+};
 
 const TileCollisionFunctions = {
-    '#' : movePlayerBackToPreviousPosition,
-    'd' : walkIntoDoor,
-    'k' : walkIntoKey,
-    'G' : walkIntoGoal
-}
+	'#' : () => { game.movePlayerBackToPreviousPosition(); },
+	'd' : () => { game.walkIntoDoor(); },
+	'k' : () => { game.walkIntoKey(); },
+	'G' : () => { game.walkIntoGoal(); }
+};
 
 const ESCAPE = 27, UP = 38, DOWN = 40, LEFT = 37, RIGHT = 39;
 const KeyMapRules = [
-    [UP, ()=>{ APP.translatePlayer(0, -1); }],
-    [LEFT, ()=>{ APP.translatePlayer(-1, 0); }],
-    [DOWN, ()=>{ APP.translatePlayer(0, 1); }],
-    [RIGHT, ()=>{ APP.translatePlayer(1, 0); }],
-    [ESCAPE, ()=>{ startGame(); }],
-    ['\n'.charCodeAt(0), movePlayerToStart],
-    ['\r'.charCodeAt(0), movePlayerToStart],
-    ['W'.charCodeAt(0), ()=>{ APP.translatePlayer(0, -1); }],
-    ['A'.charCodeAt(0), ()=>{ APP.translatePlayer(-1, 0); }],
-    ['S'.charCodeAt(0), ()=>{ APP.translatePlayer(0, 1); }],
-    ['D'.charCodeAt(0), ()=>{ APP.translatePlayer(1, 0); }],
+	[UP, () => { game.translatePlayer(0, -1); }],
+	[LEFT, () => { game.translatePlayer(-1, 0); }],
+	[DOWN, () => { game.translatePlayer(0, 1); }],
+	[RIGHT, () => { game.translatePlayer(1, 0); }],
+	[ESCAPE, () => { startGame(); }],
+	['\n'.charCodeAt(0), () => { game.movePlayerToStart() }],
+	['\r'.charCodeAt(0), () => { game.movePlayerToStart() }],
+	['W'.charCodeAt(0), () => { game.translatePlayer(0, -1); }],
+	['A'.charCodeAt(0), () => { game.translatePlayer(-1, 0); }],
+	['S'.charCodeAt(0), () => { game.translatePlayer(0, 1); }],
+	['D'.charCodeAt(0), () => { game.translatePlayer(1, 0); }],
 ];
 
-const SquareWidthPixels = 32, SquareHeightPixels = 32;
-const MazeWidthTiles = 16, MazeHeightTiles = 12;
-const IconOffsetX = 8, IconOffsetY = 8;
-
-var APP;
+var game;
 
 function startGame() {
-	if (!APP) {
-		APP = new App();
-		document.onkeydown = (e) => APP.handleKeypress(e);
+	if (!game) {
+		game = new MazeGame();
+		document.onkeydown = (e) => game.handleKeypress(e);
 	}
-	APP.initialize(KeyMapRules);
+	game.initialize(KeyMapRules);
 }
 
 class Map2d {
 	constructor(source, columns, rows) {
-		this.mazeDataString = source;
+		this.mapDataString = source;
 		this.width = columns;
 		this.height = rows;
 	}
 
-	getAt(col, row) {
-		return this.mazeDataString[this.getIndex(col, row)];
-	}
+	getAt(col, row) { return this.mapDataString[this.getIndex(col, row)]; }
 
-	getIndex(col, row) {
-		return row * MazeWidthTiles + col;
-	}
+	getIndex(col, row) { return row * this.width + col; }
 
-	setAt(col, row, tileCharacter) {
-		this.mazeDataString = Map2d.characterReplace(this.mazeDataString, this.getIndex(col, row), ' ');
+	setAt(col, row, value) {
+		this.mapDataString = Map2d.characterReplace(this.mapDataString, this.getIndex(col, row), value);
 	}
 
 	static characterReplace(str, index, replacement) {
 		return str.substring(0, index) + replacement + str.substring(index + 1);
 	}
-
 }
 
-class Map2dGraphic extends Map2d {
-	constructor(source, columns, rows, SquareWidthPixels, SquareHeightPixels, MazeTileColors) {
+class Map2dTileGraphic extends Map2d {
+	constructor(source, columns, rows, tileWidthPixels, tileHeightPixels, tileColorsMap) {
 		super(source, columns, rows);
-		this.SquareWidthPixels = SquareWidthPixels;
-		this.SquareHeightPixels = SquareHeightPixels;
-		this.MazeTileColors = MazeTileColors;
+		this.tileWidthPixels = tileWidthPixels;
+		this.tileHeightPixels = tileHeightPixels;
+		this.tileColorsMap = tileColorsMap;
 	}
 
-	drawGameTiles(ctx) {
+	drawTiles(ctx) {
 		let col = 0, row = 0;
 		for (let row = 0; row < this.height; row++) {
 			for (let col = 0; col < this.width; col++) {
-				this.drawMapTile(ctx, col, row);
+				this.drawTile(ctx, col, row);
 			}
 		}
 	}
 
-	drawMapTile(ctx, col, row) {
+	drawTile(ctx, col, row) {
 		let mazeTile = this.getAt(col, row);
-		let color = this.MazeTileColors[mazeTile];
+		let color = this.tileColorsMap[mazeTile];
 		if (color == undefined) {
-			color = this.MazeTileColors[undefined];
+			color = this.tileColorsMap[undefined];
 		}
 		this.drawTileWithColor(ctx, col, row, color);
 	}
@@ -138,126 +132,14 @@ class Map2dGraphic extends Map2d {
 		}
 		let pixel = this.pixelLocationOfTile(col, row);
 		ctx.fillStyle = color;
-		ctx.fillRect(pixel.x, pixel.y, this.SquareWidthPixels, this.SquareHeightPixels);
+		ctx.fillRect(pixel.x, pixel.y, this.tileWidthPixels, this.tileHeightPixels);
 	}
 
 	pixelLocationOfTile(col, row) {
 		return {
-			x : col * this.SquareWidthPixels,
-			y : row * this.SquareHeightPixels,
+			x : col * this.tileWidthPixels,
+			y : row * this.tileHeightPixels,
 		};
-	}
-}
-
-class TileGameObjects {
-	constructor(MazeTileIcon, SquareWidthPixels, SquareHeightPixels, InitialMapFunction) {
-		this.MazeTileIcon = MazeTileIcon;
-		this.gameObjects = [];
-		this.SquareWidthPixels = SquareWidthPixels;
-		this.SquareHeightPixels = SquareHeightPixels;
-		this.InitialMapFunction = InitialMapFunction;
-	}
-
-	pixelLocationOfTile(col, row) {
-		return {
-			x : col * this.SquareWidthPixels,
-			y : row * this.SquareHeightPixels,
-		};
-	}
-
-	initailize() {
-		if (this.gameObjects) {
-			this.removeAllObjects();
-		}
-	}
-
-	drawGameObjects(ctx) {
-		for(let i = 0; i < this.gameObjects.length; ++i) {
-			this.drawGameObject(ctx, this.gameObjects[i]);
-		}
-	}
-
-	drawGameObject(ctx, gameObject) {
-		let pixelLocation = this.pixelLocationOfTile(gameObject.x, gameObject.y);
-		this.moveIconToPixelLocation(gameObject.icon, pixelLocation);
-		// if (Dom.isElementVisible(gameObject.icon)) {
-		// 	this.drawTileWithColor(ctx, gameObject.x, gameObject.y, gameObject.tileColor);
-		// }
-	}
-
-	moveIconToPixelLocation(icon, pixelLocation) {
-		icon.style.left = pixelLocation.x + "px";
-		icon.style.top = pixelLocation.y + "px";
-	}
-
-	createTileIconObjects() {
-		for (let row = 0; row < MazeHeightTiles; row++) {
-			for(let col = 0; col < MazeWidthTiles; col++) {
-				this.createTileObject(col, row);
-			}
-		}
-		Dom.hideElements(Object.values(this.MazeTileIcon));
-	}
-
-	createTileObject(col, row) {
-		let mazeTile = this.InitialMapFunction(col,row);
-		let icon = this.MazeTileIcon[mazeTile];
-		//let color = MazeTileColors[mazeTile];
-		if (icon != undefined) {
-			//this.createNewTileIconObjectAtLocation(icon, color, col, row);
-			this.createNewTileIconObjectAtLocation(icon, col, row);
-		}
-	}
-
-	//createNewTileIconObjectAtLocation(originalIconId, tileColor, col, row) {
-	createNewTileIconObjectAtLocation(originalIconId, col, row) {
-		let originalIconObject = Dom.byID(originalIconId);
-		let icon = originalIconObject.cloneNode(true);
-		this.setIconSizeToMatchTileSize(icon);
-		document.body.appendChild(icon);
-		let gameObject = {
-			x: col,
-			y: row,
-			icon: icon,
-			name: originalIconId,
-			//tileColor: tileColor
-		};
-		this.gameObjects.push(gameObject);
-		icon.id += this.gameObjects.length;
-		let pixel = this.pixelLocationOfTile(col, row);
-		this.moveIconToPixelLocation(icon, pixel);
-		icon.style.display = 'inline';
-	}
-
-	findGameObject(name) {
-		for (let i = 0; i < this.gameObjects.length; i++) {
-			if (this.gameObjects[i].name == name) {
-				return this.gameObjects[i];
-			}
-		}
-	}
-
-	getObjectAt(col, row, name) {
-		for (let i = 0; i < this.gameObjects.length; i++) {
-			let gameObject = this.gameObjects[i];
-			if(gameObject && gameObject.y == row && gameObject.x == col && gameObject.name == name) {
-				return gameObject;
-			}
-		}
-		return null;
-	}
-
-	removeAllObjects() {
-		for (let i = 0; i < this.gameObjects.length; i++) {
-			let obj = this.gameObjects[i]
-			obj.icon.parentNode.removeChild(obj.icon);
-		}
-		this.gameObjects = [];
-	}
-
-	setIconSizeToMatchTileSize(itm) {
-		itm.style.width = SquareWidthPixels + "px";
-		itm.style.height = SquareHeightPixels + "px";
 	}
 }
 
@@ -278,36 +160,87 @@ class Dom {
 	}
 }
 
-class App {
+class MazeGame {
 	constructor() {
 		this.canvas = document.createElement("canvas");
 		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
 	}
+
 	initialize(keyMapArray) {
 		this.keyMap = { };
 		this.applyKeyMapRules(keyMapArray);
-		this.player = { x : 0, y : 0 };
-		this.canvas.width = MazeWidthTiles * SquareWidthPixels;
-		this.canvas.height = MazeHeightTiles * SquareHeightPixels;
+		this.canvas.width = MazeWidthTiles * TileWidthPixels;
+		this.canvas.height = MazeHeightTiles * TileHeightPixels;
 		this.context = this.canvas.getContext("2d");
+		this.player = { x : 0, y : 0 };
 		this.keys = 0;
-		this.map = new Map2dGraphic(MazeTilesString, MazeWidthTiles, MazeHeightTiles, SquareWidthPixels, SquareHeightPixels, MazeTileColors);
-		if (!this.objMap) {
-			this.objMap = new TileGameObjects(MazeTileIcon, SquareWidthPixels, SquareHeightPixels,
-				(col, row) => {
-					return this.map.getAt(col, row);
-				}
-			);
+		this.map = new Map2dTileGraphic(MazeTilesString, MazeWidthTiles, MazeHeightTiles, TileWidthPixels, TileHeightPixels, MazeTileColors);
+		if (this.gameObjects != null) {
+			this.removeAllObjects();
 		}
-		this.objMap.initailize();
-		this.objMap.createTileIconObjects();
+		this.gameObjects = this.createGameObjects(MazeTileIcon);
 		this.setupPlayer();
-		createInventoryUI();
-		updateKeyCountUI();
-		movePlayerToStart();
+		this.createInventoryUI();
+		this.updateKeyCountUI();
+		this.movePlayerToStart();
 		this.drawGame();
 	}
 	
+	createGameObjects(mazeTileIcon) {
+		let gameObjects = [];
+		Dom.hideElements(Object.values(mazeTileIcon));
+		for (let row = 0; row < this.map.height; ++row) {
+			for (let col = 0; col < this.map.width; ++col) {
+				let tile = this.map.getAt(col, row);
+				let icon = mazeTileIcon[tile];
+				if (icon !== undefined) {
+					var gameObject = this.createNewTileIconObjectAtLocation(icon, col, row);
+					gameObjects.push(gameObject);
+				}
+			}
+		}
+		return gameObjects;
+	}
+
+	removeAllObjects() {
+		for (let i = 0; i < this.gameObjects.length; i++) {
+			let obj = this.gameObjects[i]
+			obj.icon.parentNode.removeChild(obj.icon);
+		}
+		this.gameObjects = null;
+	}
+
+	createNewTileIconObjectAtLocation(iconId, col, row) {
+		let gameObject = {
+			col: col,
+			row: row,
+			icon: this.createIconObject(iconId),
+			name: iconId
+		};
+		document.body.appendChild(gameObject.icon);
+		let pixel = this.map.pixelLocationOfTile(col, row);
+		this.moveIconToPixelLocation(gameObject.icon, pixel);
+		gameObject.icon.style.display = 'inline';
+		return gameObject;
+	}
+
+	createIconObject(originalIconId) {
+		let originalIconObject = Dom.byID(originalIconId);
+		let icon = originalIconObject.cloneNode(true);
+		this.setIconSizeToMatchTileSize(icon);
+		return icon;
+	}
+
+	moveIconToPixelLocation(icon, pixelLocation) {
+		icon.style.left = pixelLocation.x + "px";
+		icon.style.top = pixelLocation.y + "px";
+	}
+
+	setIconSizeToMatchTileSize(itm) {
+		itm.style.width = TileWidthPixels + "px";
+		itm.style.height = TileHeightPixels + "px";
+	}
+
 	handleKeypress(e) {
 		this.userKeyInput(e);
 		this.updateGame();
@@ -316,8 +249,8 @@ class App {
 
 	drawGame() {
 		let ctx = this.canvas.getContext("2d");
-		this.map.drawGameTiles(ctx);
-		this.objMap.drawGameObjects(ctx);
+		this.map.drawTiles(ctx);
+		this.drawGameObjects(ctx);
 		if(this.winner) {
 			this.drawWinMessage(ctx, "Winner!", "#0f0");
 		}
@@ -352,20 +285,20 @@ class App {
 		}
 	}
 
-	translatePlayer(deltaX, deltaY) {
+	translatePlayer(deltaCol, deltaRow) {
 		this.oldPosition = {
-			x : this.player.x,
-			y : this.player.y
+			col : this.player.col,
+			row : this.player.row
 		};
-		this.player.x += deltaX;
-		this.player.y += deltaY;
+		this.player.col += deltaCol;
+		this.player.row += deltaRow;
 	}
 
 	updateGame() {
-		let playerX = this.player.x;
-		let playerY = this.player.y;
-		let playerTileFloor = this.map.getAt(playerX, playerY);
-		if (playerX < 0 || playerX >= MazeWidthTiles || playerY < 0 || playerY >= MazeHeightTiles) {
+		let playerCol = this.player.col;
+		let playerRow = this.player.row;
+		let playerTileFloor = this.map.getAt(playerCol, playerRow);
+		if (playerCol < 0 || playerCol >= MazeWidthTiles || playerRow < 0 || playerRow >= MazeHeightTiles) {
 			this.movePlayerBackToPreviousPosition();
 		}
 		let tileCollisionFunction = TileCollisionFunctions[playerTileFloor];
@@ -375,72 +308,99 @@ class App {
 	}
 
 	setupPlayer() {
-		this.player = this.objMap.findGameObject("player");
+		this.player = this.findGameObject("player");
+	}
+
+	movePlayerBackToPreviousPosition() {
+		this.player.col = this.oldPosition.col;
+		this.player.row = this.oldPosition.row;
+	}
+
+	walkIntoDoor() {
+		if (this.keys <= 0) {
+			this.movePlayerBackToPreviousPosition();
+		} else {
+			this.keys--;
+			this.updateKeyCountUI();
+			this.openDoor(this.player.col, this.player.row);
+		}
+	}
+
+	walkIntoKey() {
+		this.keys++;
+		this.updateKeyCountUI();
+		let p = this.player;
+		this.map.setAt(p.col, p.row, ' ');
+		this.getObjectAt(p.col, p.row, "key").icon.style.visibility = 'hidden';
+	}
+
+	walkIntoGoal() {
+		this.winner = true;
+	}
+
+	openDoor(col, row) {
+		this.map.setAt(col, row, ' ');
+		this.getObjectAt(col, row, "door").icon.style.display = 'none';
+	}
+
+	movePlayerToStart() {
+		let index = this.map.mapDataString.indexOf('S');
+		this.player.col = index % this.map.width;
+		this.player.row = parseInt(index / this.map.width);
+	}
+
+	drawGameObjects(ctx) {
+		for(let i = 0; i < this.gameObjects.length; ++i) {
+			this.drawGameObject(ctx, this.gameObjects[i]);
+		}
+	}
+
+	drawGameObject(ctx, gameObject) {
+		let pixelLocation = this.map.pixelLocationOfTile(gameObject.col, gameObject.row);
+		this.moveIconToPixelLocation(gameObject.icon, pixelLocation);
+	}
+
+	findGameObject(name) {
+		for (let i = 0; i < this.gameObjects.length; i++) {
+			if (this.gameObjects[i].name == name) {
+				return this.gameObjects[i];
+			}
+		}
+	}
+
+	getObjectAt(col, row, name) {
+		for (let i = 0; i < this.gameObjects.length; i++) {
+			let gameObject = this.gameObjects[i];
+			if(gameObject && gameObject.row == row && gameObject.col == col && gameObject.name == name) {
+				return gameObject;
+			}
+		}
+		return null;
+	}
+
+	createInventoryUI() {
+		if (this.keyCountUI != null) {
+			return;
+		}
+		this.addKeyInventoryUiToDom();
+	}
+
+	addKeyInventoryUiToDom() {
+		let uiArea = Dom.byID("bottomUI");
+		let icon = Dom.byID("key").cloneNode(true);
+		this.setIconSizeToMatchTileSize(icon);
+		icon.style.display = 'inline'
+		icon.style.position = 'relative';
+		uiArea.appendChild(icon);
+		this.keyCountUI = document.createElement("span");
+		this.keyCountUI.style.position = 'relative';
+		uiArea.appendChild(this.keyCountUI);
+	}
+
+	updateKeyCountUI() {
+		this.keyCountUI.innerHTML = "x" + this.keys;
 	}
 }
-
-function movePlayerBackToPreviousPosition() {
-	APP.player.x = APP.oldPosition.x;
-	APP.player.y = APP.oldPosition.y;
-}
-
-function walkIntoDoor() {
-	if (APP.keys <= 0) {
-		movePlayerBackToPreviousPosition();
-	} else {
-		APP.keys--;
-		updateKeyCountUI();
-		openDoor(APP.player.x, APP.player.y);
-	}
-}
-
-function walkIntoKey() {
-	APP.keys++;
-	updateKeyCountUI();
-	APP.map.setAt(APP.player.x, APP.player.y, ' ');
-	APP.objMap.getObjectAt(APP.player.x, APP.player.y, "key").icon.style.visibility = 'hidden';
-}
-
-function walkIntoGoal() {
-	APP.winner = true;
-}
-
-function openDoor(col, row) {
-	APP.map.setAt(col, row, ' ');
-	APP.objMap.getObjectAt(col, row, "door").icon.style.display = 'none';
-}
-
-function movePlayerToStart() {
-	let index = APP.map.mazeDataString.indexOf('S');
-	APP.player.x = index % APP.map.width;
-	APP.player.y = parseInt(index / APP.map.width);
-}
-
-let keyCountUI = null;
-
-function createInventoryUI() {
-	if (keyCountUI != null) {
-		return;
-	}
-	addKeyInventoryUiToDom();
-}
-
-function addKeyInventoryUiToDom() {
-	let uiArea = Dom.byID("bottomUI");
-	let icon = Dom.byID("key").cloneNode(true);
-	APP.objMap.setIconSizeToMatchTileSize(icon);
-	icon.style.display = 'inline'
-	icon.style.position = 'relative';
-	uiArea.appendChild(icon);
-	keyCountUI = document.createElement("span");
-	keyCountUI.style.position = 'relative';
-	uiArea.appendChild(keyCountUI);
-}
-
-function updateKeyCountUI() {
-	keyCountUI.innerHTML = "x" + APP.keys;
-}
-
-        </script>
-    </body>
+		</script>
+	</body>
 </html>

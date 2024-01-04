@@ -5,8 +5,8 @@
 		body { margin:0; padding:0; }
 	</style>
 	</head>
-<body onload="startGame()" onmousemove="mouseMoveFunction()">
-        <script>
+	<body onload="startGame()" onmousemove="mouseMoveFunction()">
+		<script>
 var APP;
 
 function startGame() {
@@ -14,8 +14,8 @@ function startGame() {
 }
 
 function continueApp() {
-	setTimeout(continueApp, 10);
 	APP.update();
+	setTimeout(continueApp, 10);
 }
 
 function mouseMoveFunction() {
@@ -33,6 +33,7 @@ class Ball {
 		this.fillColor = fillColor;
 		this.borderThickness = borderThickness;
 	}
+
 	draw(ctx) {
 		ctx.beginPath();
 		if (this.strokeColor) {
@@ -48,13 +49,15 @@ class Ball {
 		ctx.lineTo(this.x + this.dx, this.y + this.dy);
 		ctx.stroke();
 	}
-	update() {
-		let movedX = this.dx * APP.deltaTime / 1000.0;
-		let movedY = this.dy * APP.deltaTime / 1000.0;
+
+	update(deltaTime) {
+		let movedX = this.dx * deltaTime;
+		let movedY = this.dy * deltaTime;
 		this.x += movedX;
 		this.y += movedY;
 	}
-	setVelocity(dx, dy) {
+
+	setEndOfLine(dx, dy) {
 		this.dx = dx;
 		this.dy = dy;
 	}
@@ -65,17 +68,16 @@ let ball = new Ball(0, 0, 20, 0, 0, 'black', 'red', 0.25);
 class App {
 	constructor() {
 		this.canvas = document.createElement("canvas"),
-		this.ctx = this.canvas.getContext("2d");
 		this.now = Date.now();
 		console.log("creating "+this.now);
 		this.then = Date.now();
 		this.targetFps = 90;
 		this.mouse = {x: 0, y: 0};
-        this.canvas.width = 800;
-        this.canvas.height = 600;
-        this.context = this.canvas.getContext("2d");
-        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        document.onkeydown = userkey;
+		this.canvas.width = 800;
+		this.canvas.height = 600;
+		this.context = this.canvas.getContext("2d");
+		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+		document.onkeydown = userkey;
 	}
 
 	updateMousePosition(e) {
@@ -99,27 +101,25 @@ class App {
 		this.updateTiming();
 		if (!this.deltaTime) { return; }
 		if (this.mouse) {
-			ball.setVelocity(this.mouse.x - ball.x, this.mouse.y - ball.y);
+			ball.setEndOfLine(this.mouse.x - ball.x, this.mouse.y - ball.y);
 		}
-		ball.update();
+		ball.update(this.deltaTime / 1000);
 		this.drawGame();
 	}
 
 	drawGame() {
-		console.log(this.deltaTime < 20);
+		//this.clear();
 		this.ctx = this.canvas.getContext("2d");
 		this.ctx.font = "30px Arial";
 		this.ctx.fillStyle = "#0f0";
 		this.ctx.textAlign = "center";
 		this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
-
-        //this.clear();
 		ball.draw(this.ctx, '#000', 'red', 0.25);
 	}
 
 	clear() {
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+	}
 };
 APP = new App();
 
@@ -129,8 +129,12 @@ function userkey(e) {
 	if (e.keyCode === ESCAPE) {
 		APP.clear();
 	}
-    console.log("key: "+e.keyCode)
+	console.log("key: "+e.keyCode)
 };
-        </script>
-    </body>
+		</script>
+		<br>
+		could we implement <a href="https://www.red3d.com/cwr/steer/gdc99/">steering</a>
+		<a href="https://devforum.roblox.com/t/introduction-to-steering-behaviors/1441680/6">behavior</a>
+		for our agent?
+	</body>
 </html>
