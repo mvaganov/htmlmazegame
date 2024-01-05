@@ -5,22 +5,101 @@
 		body { margin:0; padding:0; }
 	</style>
 	</head>
-	<body onload="startGame()" onmousemove="mouseMoveFunction()">
+	<body onload="startGame()" onmousemove="mouseMoveInterrupt()" onkeydown="keyDownInterrupt()">
 		<script>
 var APP;
+var ball;
 
 function startGame() {
-	continueApp();
+	mainLoop();
 }
 
-function continueApp() {
+function mainLoop() {
+	APP.processInput();
 	APP.update();
-	setTimeout(continueApp, 10);
+	APP.drawGame();
+	setTimeout(mainLoop, 10);
 }
 
-function mouseMoveFunction() {
-	APP.updateMousePosition(window.event);
+function mouseMoveInterrupt(e) {
+	APP.updateMousePosition(e || window.event);
 }
+
+function keyDownInterrupt(e) {
+	APP.updateKeyInput(e || window.event);
+}
+
+class App {
+	constructor() {
+		this.canvas = document.createElement("canvas"),
+		this.now = Date.now();
+		console.log("creating "+this.now);
+		this.then = Date.now();
+		this.targetFps = 90;
+		this.mouse = {x: 0, y: 0};
+		this.canvas.width = 800;
+		this.canvas.height = 600;
+		this.context = this.canvas.getContext("2d");
+		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+		document.onkeydown = this.userkey;
+	}
+
+	updateKeyInput(e) {
+		const ESCAPE = 27;
+		if (e.keyCode === ESCAPE) {
+			this.clearScreen = true;
+		} else {
+			console.log("key: "+e.keyCode)
+		}
+	};
+
+	updateMousePosition(e) {
+		if (!e) {
+			return;
+		}
+		this.mouse.x = e.clientX;
+		this.mouse.y = e.clientY;
+	}
+
+	processInput() {
+		if (this.mouse) {
+			ball.setEndOfLine(this.mouse.x - ball.x, this.mouse.y - ball.y);
+		}
+		if (this.clearScreen) {
+			this.clear();
+			this.clearScreen = false;
+		}
+	}
+
+	drawGame() {
+		//this.clear();
+		this.ctx = this.canvas.getContext("2d");
+		this.ctx.font = "30px Arial";
+		this.ctx.fillStyle = "#0f0";
+		this.ctx.textAlign = "center";
+		this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
+		ball.draw(this.ctx, '#000', 'red', 0.25);
+	}
+
+	update() {
+		this.updateTiming();
+		if (!this.deltaTime) { return; }
+		ball.update(this.deltaTime / 1000);
+	}
+
+	updateTiming() {
+		this.now = Date.now();
+		let deltaTime = this.now - this.then;
+		if (deltaTime) {
+			this.deltaTime = deltaTime;
+		}
+		this.then = this.now;
+	}
+
+	clear() {
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+	}
+};
 
 class Ball {
 	constructor(x, y, radius, dx, dy, strokeColor, fillColor, borderThickness){
@@ -63,74 +142,9 @@ class Ball {
 	}
 };
 
-let ball = new Ball(0, 0, 20, 0, 0, 'black', 'red', 0.25);
-
-class App {
-	constructor() {
-		this.canvas = document.createElement("canvas"),
-		this.now = Date.now();
-		console.log("creating "+this.now);
-		this.then = Date.now();
-		this.targetFps = 90;
-		this.mouse = {x: 0, y: 0};
-		this.canvas.width = 800;
-		this.canvas.height = 600;
-		this.context = this.canvas.getContext("2d");
-		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-		document.onkeydown = userkey;
-	}
-
-	updateMousePosition(e) {
-		if (!e) {
-			return;
-		}
-		this.mouse.x = e.clientX;
-		this.mouse.y = e.clientY;
-	}
-
-	updateTiming() {
-		this.now = Date.now();
-		let deltaTime = this.now - this.then;
-		if (deltaTime) {
-			this.deltaTime = deltaTime;
-		}
-		this.then = this.now;
-	}
-
-	update() {
-		this.updateTiming();
-		if (!this.deltaTime) { return; }
-		if (this.mouse) {
-			ball.setEndOfLine(this.mouse.x - ball.x, this.mouse.y - ball.y);
-		}
-		ball.update(this.deltaTime / 1000);
-		this.drawGame();
-	}
-
-	drawGame() {
-		//this.clear();
-		this.ctx = this.canvas.getContext("2d");
-		this.ctx.font = "30px Arial";
-		this.ctx.fillStyle = "#0f0";
-		this.ctx.textAlign = "center";
-		this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
-		ball.draw(this.ctx, '#000', 'red', 0.25);
-	}
-
-	clear() {
-		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-	}
-};
 APP = new App();
+ball = new Ball(0, 0, 20, 0, 0, 'black', 'red', 0.25);
 
-const ESCAPE = 27;
-function userkey(e) {
-    e = e || window.event;
-	if (e.keyCode === ESCAPE) {
-		APP.clear();
-	}
-	console.log("key: "+e.keyCode)
-};
 		</script>
 		<br>
 		could we implement <a href="https://www.red3d.com/cwr/steer/gdc99/">steering</a>
