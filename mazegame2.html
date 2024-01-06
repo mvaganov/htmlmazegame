@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+			.icon {position:absolute; left:0px; top:0px; }
+		</style>
+	</head>
+	<body>
+		<img src="http://codegiraffe.com/htmlgame/player.png" id="player" class="icon">
+		<script>
+var player = {x:100, y:50};
+
+document.onkeydown = function (e){
+	userkey(e);
+	movePlayerIcon();
+}
+
+const UP = 30, DOWN = 40, LEFT = 37, RIGHT = 39;
+function userkey(e) {
+	e = e || window.event;
+	if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
+		player.y--;
+	} else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
+		player.y++;
+	} else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
+		player.x--;
+	} else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
+		player.x++;
+	} else {
+		console.log("key: "+e.keyCode)
+	}
+};
+
+function movePlayerIcon() {
+	let icon = document.getElementById("player");
+	icon.style.left = player.x + "px";
+	icon.style.top = player.y + "px";
+}
+movePlayerIcon();
+		</script>
+	</body>
+</html>
