@@ -1,59 +1,52 @@
 <!DOCTYPE html>
 <html>
-    <body onload="startGame()" >
-        <script>
+	<body onload="startGame()" >
+		<script>
+var canvas = document.createElement("canvas");
+canvas.width = 800;
+canvas.height = 600;
+var context = canvas.getContext("2d");
+var player = {x:100, y:50};
+
 function startGame() {
-    myGame.initialize();
+	document.body.insertBefore(canvas, document.body.childNodes[0]);
+	document.onkeydown = function (e){
+		userkey(e);
+		drawGame();
+	}
+	drawGame();
 }
 
-var myGame = {
-    canvas : document.createElement("canvas"),
-    initialize : function() {
-        this.canvas.width = 800;
-        this.canvas.height = 600;
-        this.context = this.canvas.getContext("2d");
-        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        this.player = {x:100, y:50};
-        document.onkeydown = function (e){
-            userkey(e);
-            drawGame();
-        }
-        this.clear();
-        drawGame();
-    },
-    clear : function() {
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-};
-
 function drawGame() {
-    var ctx = myGame.canvas.getContext("2d");
-    ctx.fillStyle = "#F00";
-    ctx.fillRect(myGame.player.x, myGame.player.y, 3, 8);
-    ctx.font = "30px Arial";
-    ctx.fillStyle = "#0f0";
-    ctx.textAlign = "center";
-    ctx.fillText("Hello World!", myGame.canvas.width / 2, myGame.canvas.height / 2);
+	context.fillStyle = "#F00";
+	context.fillRect(player.x, player.y, 3, 8);
+	context.font = "30px Arial";
+	context.fillStyle = "#0f0";
+	context.textAlign = "center";
+	context.fillText("Hello World!", canvas.width / 2, canvas.height / 2);
+}
+
+function clear() {
+	context.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 const ESCAPE = 27, UP = 30, DOWN = 40, LEFT = 37, RIGHT = 39;
 function userkey(e) {
-    e = e || window.event;
-    var p = myGame.player;
-    if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
-        p.y--;
-    } else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
-        p.y++;
-    } else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
-        p.x--;
-    } else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
-        p.x++;
-    } else if (e.keyCode == ESCAPE) {
-        startGame();
-    } else {
-        console.log("key: "+e.keyCode)
-    }
+	e = e || window.event;
+	if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
+		player.y--;
+	} else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
+		player.y++;
+	} else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
+		player.x--;
+	} else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
+		player.x++;
+	} else if (e.keyCode == ESCAPE) {
+		startGame();
+	} else {
+		console.log("key: "+e.keyCode)
+	}
 };
-        </script>
-    </body>
+		</script>
+	</body>
 </html>

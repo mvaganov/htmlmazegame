@@ -5,14 +5,10 @@
 		body { margin:0; padding:0; }
 	</style>
 	</head>
-	<body onload="startGame()" onmousemove="mouseMoveInterrupt()" onkeydown="keyDownInterrupt()">
+	<body onload="mainLoop()" onmousemove="mouseMoveInterrupt()" onkeydown="keyDownInterrupt()" onmousedown="mouseDownInterrupt()">
 		<script>
 var APP;
 var ball;
-
-function startGame() {
-	mainLoop();
-}
 
 function mainLoop() {
 	APP.processInput();
@@ -27,6 +23,10 @@ function mouseMoveInterrupt(e) {
 
 function keyDownInterrupt(e) {
 	APP.updateKeyInput(e || window.event);
+}
+
+function mouseDownInterrupt(e) {
+	APP.updateMouseDownInput(e || window.event);
 }
 
 class App {
@@ -61,6 +61,11 @@ class App {
 		this.mouse.y = e.clientY;
 	}
 
+	updateMouseDownInput(e) {
+		this.updateMousePosition(e);
+		console.log("clicked " + this.mouse.x + " " + this.mouse.y);
+	}
+
 	processInput() {
 		if (this.mouse) {
 			ball.setEndOfLine(this.mouse.x - ball.x, this.mouse.y - ball.y);
@@ -83,8 +88,10 @@ class App {
 
 	update() {
 		this.updateTiming();
-		if (!this.deltaTime) { return; }
-		ball.update(this.deltaTime / 1000);
+		let timeHasPassed = this.deltaTime > 0;
+		if (timeHasPassed) { 
+			ball.update(this.deltaTime / 1000);
+		}
 	}
 
 	updateTiming() {
@@ -101,7 +108,7 @@ class App {
 	}
 };
 
-class Ball {
+class Agent {
 	constructor(x, y, radius, dx, dy, strokeColor, fillColor, borderThickness){
 		this.x = x;
 		this.y = y;
@@ -143,7 +150,7 @@ class Ball {
 };
 
 APP = new App();
-ball = new Ball(0, 0, 20, 0, 0, 'black', 'red', 0.25);
+ball = new Agent(0, 0, 20, 0, 0, 'black', 'red', 0.25);
 
 		</script>
 		<br>
