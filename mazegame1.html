@@ -1,8 +1,8 @@
 
 <!DOCTYPE html>
 <html>
-    <body onload="startGame()" >
-        <script>
+	<body onload="startGame()" >
+		<script>
 var squareWidthPixels = 32, squareHeightPixels = 32;
 var maze_width = 16, maze_height = 12;
 var maze_data =
@@ -20,171 +20,76 @@ var maze_data =
 "################";
 
 function drawGame() {
-    // draw colored squares
-    var col=0,row=0,index=0;
-    var pixelX, pixelY, pixelColor;
-    var ctx = myGame.canvas.getContext("2d");
-    for(row=0;row<maze_height;row++){
-        for(col=0;col<maze_width;col++){
-            index = row*maze_width+col;
-            pixelX = col*squareWidthPixels, pixelY = row*squareHeightPixels;
-            pixelColor = "#fff";
-            switch (maze_data[index]) {
-                case '#': pixelColor="#000"; break;
-                case 'S': pixelColor="#ddd"; break;
-                case 'G': pixelColor="#0F0"; break;
-                case 'd': pixelColor="#883"; break;
-                case 'k': pixelColor="#fed"; break;
-            }
-            ctx.fillStyle = pixelColor;
-            ctx.fillRect(pixelX, pixelY, squareWidthPixels, squareHeightPixels);
-        }
-    }
-    // draw the player's colored square
-    x = myGame.p.x * squareWidthPixels, y = myGame.p.y * squareHeightPixels;
-    ctx.fillStyle = "#eef";
-    ctx.fillRect(x, y, squareWidthPixels, squareHeightPixels);
+	// draw colored squares
+	var col=0,row=0,index=0;
+	var pixelX, pixelY, pixelColor;
+	var ctx = canvas.getContext("2d");
+	for(row=0;row<maze_height;row++){
+		for(col=0;col<maze_width;col++){
+			index = row*maze_width+col;
+			pixelX = col*squareWidthPixels, pixelY = row*squareHeightPixels;
+			pixelColor = "#fff";
+			switch (maze_data[index]) {
+				case '#': pixelColor="#000"; break;
+				case 'S': pixelColor="#ddd"; break;
+				case 'G': pixelColor="#ccf"; break;
+				case 'd': pixelColor="#883"; break;
+				case 'k': pixelColor="#fe7"; break;
+			}
+			ctx.fillStyle = pixelColor;
+			ctx.fillRect(pixelX, pixelY, squareWidthPixels, squareHeightPixels);
+		}
+	}
+	// draw the player's colored square
+	x = player.x * squareWidthPixels, y = player.y * squareHeightPixels;
+	ctx.fillStyle = "#afa";
+	ctx.fillRect(x, y, squareWidthPixels, squareHeightPixels);
 }
 
 const UP = 30, DOWN = 40, LEFT = 37, RIGHT = 39;
 function userkey(e){
-    e = e || window.event;
-    var p = myGame.p;
-    var oldP = {x:p.x,y:p.y};
-    if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
-        p.y--;
-    } else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
-        p.y++;
-    } else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
-        p.x--;
-    } else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
-        p.x++;
-    } else if (e.keyCode == '\n'.charCodeAt(0) || e.keyCode == '\r'.charCodeAt(0)) {
-        movePlayerToStart();
-    } else {
-        console.log("key: "+e.keyCode)
-    }
+	e = e || window.event;
+	if (e.keyCode == UP || e.keyCode == "W".charCodeAt(0)) {
+		player.y--;
+	} else if (e.keyCode == DOWN || e.keyCode == "S".charCodeAt(0)) {
+		player.y++;
+	} else if (e.keyCode == LEFT || e.keyCode == "A".charCodeAt(0)) {
+		player.x--;
+	} else if (e.keyCode == RIGHT || e.keyCode == "D".charCodeAt(0)) {
+		player.x++;
+	} else if (e.keyCode == '\n'.charCodeAt(0) || e.keyCode == '\r'.charCodeAt(0)) {
+		movePlayerToStart();
+	} else {
+		console.log("key: "+e.keyCode)
+	}
 };
 
 function movePlayerToStart() {
-    var index = maze_data.indexOf('S');
-    var p = {x:index % maze_width, y: parseInt(index/maze_width)}
-    myGame.p = p;
+	var index = maze_data.indexOf('S');
+	player.x = index % maze_width;
+	player.y = parseInt(index/maze_width);
 }
 
 function startGame() {
-    myGame.start();
-    // put the player at the start
-    movePlayerToStart();
-    document.onkeydown = function (e){
-        userkey(e);
-        drawGame();
-    }
-    if(objects.length != 0) {
-        removeAllObjects();
-    }
-    loadmazeicons();
-    drawGame();
-    createInventoryUI();
-    updateKeyCountUI();
+	// put the player at the start
+	movePlayerToStart();
+	document.onkeydown = function (e){
+		userkey(e);
+		drawGame();
+	}
+	drawGame();
 }
 
-function byID(id) { return document.getElementById(id); }
+var canvas = document.createElement("canvas");
+canvas.width = maze_width*squareWidthPixels;
+canvas.height = maze_height*squareHeightPixels;
+var context = this.canvas.getContext("2d");
+document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+var player = { x:0, y:0 };
 
-var myGame = {
-    canvas : document.createElement("canvas"),
-    start : function() {
-        this.canvas.width = maze_width*squareWidthPixels;
-        this.canvas.height = maze_height*squareHeightPixels;
-        this.context = this.canvas.getContext("2d");
-        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        this.frameNo = 0;
-        this.winner = false;
-    },
-    clear : function() {
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
+function clear() {
+	this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 }
-var objects = [];
-function getObjectAt(row, col) {
-    for(var i = 0; i < objects.length; i++) {
-        o = objects[i];
-        if(o && o.row == row && o.col == col) { return o; }
-    }
-    return null;
-}
-function removeAllObjects() {
-    for(var i = 0; i < objects.length; i++) {
-        objects[i].icon.parentNode.removeChild(objects[i].icon);
-    }
-    objects = [];
-    return null;
-}
-function loadmazeicons() {
-    function setSizeCorrectly(itm) {
-        itm.style.width = squareWidthPixels+'px';
-        itm.style.height = squareHeightPixels+'px';
-    }
-    // list of icons in the game
-    goal = byID("goal");
-    door = byID("door");
-    key = byID("key");
-    player = byID("player")
-    setSizeCorrectly(goal);
-    setSizeCorrectly(door);
-    setSizeCorrectly(key);
-    setSizeCorrectly(player);
-    for(row=0;row<maze_height;row++) {
-        for(col=0;col<maze_width;col++) {
-            index = row*maze_width+col;
-            x = col*squareWidthPixels;
-            y = row*squareHeightPixels;
-            icon = null;
-            switch (maze_data[index]) {
-                case 'G': icon = goal.cloneNode(true); break;
-                case 'd': icon = door.cloneNode(true); break;
-                case 'k': icon = key.cloneNode(true); break;
-            }
-            if(icon != null) {
-                document.body.appendChild(icon);
-                objects.push({"index":index,"row":row,"col":col,"icon":icon});
-                icon.id += objects.length;
-                icon.style.left=x+iconOffsetX+"px";
-                icon.style.top=y+iconOffsetY+"px";
-                icon.style.display = 'inline';
-            }
-        }
-    }
-    goal.style.display = door.style.display = key.style.display='none';
-}
-var keyCountUI;
-function createInventoryUI() {
-    var uiArea = byID("bottomUI");
-    if(!keyCountUI) {
-        // adding the key UI
-        var icon = byID("key").cloneNode(true);
-        icon.style.display = 'inline'
-        icon.style.position = 'relative';
-        uiArea.appendChild(icon);
-        keyCountUI = document.createElement("span");
-        keyCountUI.style.position = 'relative';
-        uiArea.appendChild(keyCountUI);
-    }
-}
-function updateKeyCountUI() {
-    keyCountUI.innerHTML = "x"+myGame.keys;
-}
-// questions:
-// * how can we keep the player from walking into walls, or walking off of the map?
-// * can the player keep track of how many times they walk overa key? can the keys be removed from the map after they are picked up?
-// * can we keep the player from walking through a door if they don't have any keys?
-// * can we make the player able to walk through one door if they pick up a key first?
-        </script>
-        <!-- list of icons in the game -->
-        <img src="http://codegiraffe.com/htmlgame/player.png" id="player" class="icon">
-        <img src="http://codegiraffe.com/htmlgame/key.png" id="key" class="icon">
-        <img src="http://codegiraffe.com/htmlgame/door.png" id="door" class="icon">
-        <img src="http://codegiraffe.com/htmlgame/goal.png" id="goal" class="icon">
-        <div class="bottomUI" id="bottomUI"></div>
-    </body>
+		</script>
+	</body>
 </html>
