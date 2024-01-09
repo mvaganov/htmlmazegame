@@ -61,7 +61,7 @@ const KeyMapRules = [
 	[LEFT, () => { game.translatePlayer(-1, 0); }],
 	[DOWN, () => { game.translatePlayer(0, 1); }],
 	[RIGHT, () => { game.translatePlayer(1, 0); }],
-	[ESCAPE, () => { startGame(); }],
+	[ESCAPE, startGame],
 	['\n'.charCodeAt(0), () => { game.movePlayerToStart() }],
 	['\r'.charCodeAt(0), () => { game.movePlayerToStart() }],
 	['W'.charCodeAt(0), () => { game.translatePlayer(0, -1); }],
