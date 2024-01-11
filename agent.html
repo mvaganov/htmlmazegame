@@ -10,6 +10,7 @@
 var APP;
 var agents;
 var getPlayer = () => agents[0];
+
 function forEachAgent(whatToDo) {
 	for (let i = 0; i < agents.length; i++) {
 		whatToDo(agents[i]);
@@ -37,7 +38,7 @@ function mouseDownInterrupt(e) {
 
 class App {
 	constructor() {
-		this.canvas = document.createElement("canvas"),
+		this.canvas = document.createElement("canvas");
 		this.now = Date.now();
 		console.log("creating "+this.now);
 		this.then = Date.now();
@@ -69,9 +70,7 @@ class App {
 
 	updateMouseDownInput(e) {
 		this.updateMousePosition(e);
-		console.log("clicked " + this.mouse.x + " " + this.mouse.y);
-		var player = getPlayer();
-		player.setEndOfLine(this.mouse.x, this.mouse.y);
+		forEachAgent(a => a.setEndOfLine(this.mouse.x, this.mouse.y));
 	}
 
 	processInput() {
@@ -117,31 +116,34 @@ class App {
 };
 
 class V2 {
-	constructor(x = 0, y = 0) { this.x = x; this.y = y; }
-	add(v) { this.x += v.x; this.y += v.y; return this; }
-	sub(v) { this.x -= v.x; this.y -= v.y; return this; }
+	constructor(x = 0, y = 0) {
+		this.x = x; this.y = y;
+		this.assert();
+	}
+	assert() { if (this.x == undefined || this.y == undefined) { throw new Error("undefined values! " + this.toString()); } }
+	add(v) { this.x += v.x; this.y += v.y; this.assert(); return this; }
+	sub(v) { this.x -= v.x; this.y -= v.y; this.assert(); return this; }
 	mul(v) {
-		if (typeof v === "object") {
-			this.x *= v.x;
-			this.y *= v.y;
+		       if (typeof v === "object") {
+			this.x *= v.x; this.y *= v.y;
 		} else if (typeof v === "number") {
-			this.x *= v;
-			this.y *= v;
+			this.x *= v; this.y *= v;
 		}
+		this.assert();
 		return this;
 	}
 	div(v) {
-		if (typeof v === "object") {
-			this.x /= v.x;
-			this.y /= v.y;
+		       if (typeof v === "object") {
+			this.x /= v.x; this.y /= v.y;
 		} else if (typeof v === "number") {
-			this.x /= v;
-			this.y /= v;
+			this.x /= v; this.y /= v;
 		}
+		this.assert();
 		return this;
 	}
 	magnitudeSq() { return this.x * this.x + this.y * this.y; }
 	magnitude() { return Math.sqrt(this.magnitudeSq()); }
+	normalized() { let mag = this.magnitude(); return new V2(this.x / mag, this.y / mag); }
 	static sum(a, b) { return new V2(a.x + b.x, a.y + b.y); }
 	static diff(a, b) { return new V2(a.x - b.x, a.y - b.y); }
 	static prod(a, b) {
@@ -168,16 +170,50 @@ V2.prototype.toString = function() {
 	return "("+this.x+","+this.y+")";
 };
 
+class BasicSeekBehavior {
+	static update (agent, deltaTime) {
+		if (!agent.target) { return; }
+		//console.log(agent.target, agent.position);
+		let delta = V2.diff(agent.target, agent.position);
+		let distance = delta.magnitude();
+		let currentSpeed = agent.velocity.magnitude();
+		let breakDistance = 2 * currentSpeed; // what is the right equation here? something that uses acceleration...
+		let needToBreak = distance < breakDistance;
+		let direction = V2.quotient(delta, distance);
+		let desiredVelocity = null;
+		agent.stopDistance = breakDistance;
+		if (needToBreak) {
+			desiredVelocity = new V2(0,0);
+		} else {
+			desiredVelocity = V2.prod(direction, agent.speed);
+		}
+		let steeringForce = V2.diff(desiredVelocity, agent.velocity);
+		let idealAcceleration = V2.diff(steeringForce, agent.velocity);
+		let accelerationMagnitude = idealAcceleration.magnitude();
+		let accelerationDirection = V2.quotient(idealAcceleration, accelerationMagnitude);
+		let accelerationInOneSecond = V2.prod(accelerationDirection, agent.acceleration);
+		let accelerationThisFrame = V2.prod(accelerationInOneSecond, deltaTime);
+		//console.log(agent.target, agent.position, "delta:", delta, "dist:", distance, " dir:", direction, " acc:", idealAcceleration, accelerationThisFrame);
+		if (agent.velocity) {
+			agent.velocity.add(accelerationThisFrame);
+		} else {
+			agent.velocity = accelerationThisFrame;
+		}
+	}
+}
+
 class Agent {
 	constructor(x, y, radius, speed, acceleration, strokeColor, fillColor, borderThickness) {
 		this.position = new V2(x,y);
 		this.velocity = new V2(0,0);
+		console.log(this.position);
 		this.radius = radius;
 		this.speed = speed;
 		this.acceleration = acceleration;
 		this.strokeColor = strokeColor;
 		this.fillColor = fillColor;
 		this.borderThickness = borderThickness;
+		this.behavior = BasicSeekBehavior;
 	}
 
 	draw(ctx) {
@@ -195,26 +231,44 @@ class Agent {
 		let endPoint = V2.sum(this.position, this.velocity);
 		ctx.lineTo(endPoint.x, endPoint.y);
 		ctx.stroke();
+		if (this.stopDistance) {
+			let moveDir = this.velocity.normalized();
+			let stopVector = V2.prod(moveDir, this.stopDistance);
+			let stopPosition = V2.sum(this.position, stopVector);
+			ctx.beginPath();
+			ctx.arc(stopPosition.x, stopPosition.y, this.radius, 0, 2 * Math.PI);
+			ctx.fillStyle = '#000';
+			ctx.fill();
+			ctx.stroke();
+		}
 	}
 
 	update(deltaTime) {
-		let movedThisFrame = V2.prod(this.velocity, deltaTime);
-		this.position.add(movedThisFrame);
-		if (this.target) {
-			let delta = V2.diff(this.target, this.position);
-			let distance = delta.magnitude();
-			if (distance < this.radius) {
-				this.velocity = new V2();
+		if (this.behavior) {
+			this.behavior.update(this, deltaTime);
+		} else {
+			if (this.target) {
+				let delta = V2.diff(this.target, this.position);
+				let distance = delta.magnitude();
+				if (distance < this.radius) {
+					this.velocity = new V2(0,0);
+				}
 			}
+		}
+		if (this.velocity) {
+			let movedThisFrame = V2.prod(this.velocity, deltaTime);
+			//console.log(this.position, movedThisFrame);
+			this.position.add(movedThisFrame);
 		}
 	}
 
 	setTarget(x, y) {
 		this.target = new V2(x, y);
-		let delta = V2.diff(this.target, this.position);
-		let distance = delta.magnitude();
-		let direction = V2.quotient(delta, distance);
-		this.velocity = V2.prod(direction, this.speed);
+		// let delta = V2.diff(this.target, this.position);
+		// let distance = delta.magnitude();
+		// let direction = V2.quotient(delta, distance);
+		// this.velocity = V2.prod(direction, this.speed);
+		console.log(this.fillColor, this.target, this.position);
 	}
 
 	setEndOfLine(x, y) {
@@ -222,13 +276,11 @@ class Agent {
 	}
 };
 
-
 APP = new App();
 agents = [
-	new Agent(100, 100, 20, 100, 5, 'orange', 'red', 0.25),
+	new Agent(100, 100, 10, 100, 5, 'orange', 'red', 0.25),
 	new Agent(0,   0,   20, 50, 20, 'cyan', 'blue', 0.25)
 ];
-
 		</script>
 		<br>
 		could we implement <a href="https://www.red3d.com/cwr/steer/gdc99/">steering</a>
