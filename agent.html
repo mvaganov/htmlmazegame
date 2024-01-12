@@ -177,13 +177,13 @@ class BasicSeekBehavior {
 		let delta = V2.diff(agent.target, agent.position);
 		let distance = delta.magnitude();
 		let currentSpeed = agent.velocity.magnitude();
-		let breakDistance = 2 * currentSpeed; // what is the right equation here? something that uses acceleration...
+		let breakDistance = currentSpeed*currentSpeed / (2 * agent.acceleration);
 		let needToBreak = distance < breakDistance;
 		let direction = V2.quotient(delta, distance);
 		let desiredVelocity = null;
 		agent.stopDistance = breakDistance;
 		if (needToBreak) {
-			desiredVelocity = new V2(0,0);
+			desiredVelocity = new V2();// V2.prod(direction, breakDistance / currentSpeed);
 		} else {
 			desiredVelocity = V2.prod(direction, agent.speed);
 		}
@@ -236,9 +236,8 @@ class Agent {
 			let stopVector = V2.prod(moveDir, this.stopDistance);
 			let stopPosition = V2.sum(this.position, stopVector);
 			ctx.beginPath();
+			ctx.fillStyle = undefined;
 			ctx.arc(stopPosition.x, stopPosition.y, this.radius, 0, 2 * Math.PI);
-			ctx.fillStyle = '#000';
-			ctx.fill();
 			ctx.stroke();
 		}
 	}
