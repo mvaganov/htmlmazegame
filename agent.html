@@ -183,7 +183,7 @@ class BasicSeekBehavior {
 		let desiredVelocity = null;
 		agent.stopDistance = breakDistance;
 		if (needToBreak) {
-			desiredVelocity = new V2();// V2.prod(direction, breakDistance / currentSpeed);
+			desiredVelocity = V2.prod(delta, currentSpeed / distance);// new V2();// V2.prod(direction, breakDistance / currentSpeed);
 		} else {
 			desiredVelocity = V2.prod(direction, agent.speed);
 		}
