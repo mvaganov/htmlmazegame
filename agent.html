@@ -83,7 +83,7 @@ class App {
 	}
 
 	drawGame() {
-		//this.clear();
+		this.clear();
 		this.ctx = this.canvas.getContext("2d");
 		this.ctx.font = "30px Arial";
 		this.ctx.fillStyle = "#0f0";
@@ -146,6 +146,7 @@ class V2 {
 	normalized() { let mag = this.magnitude(); return new V2(this.x / mag, this.y / mag); }
 	static sum(a, b) { return new V2(a.x + b.x, a.y + b.y); }
 	static diff(a, b) { return new V2(a.x - b.x, a.y - b.y); }
+	static dot(a, b) { return a.x * b.x + a.y * b.y; }
 	static prod(a, b) {
 		       if (typeof a === "object" && typeof b === "object") {
 			return new V2(a.x * b.x, a.y * b.y);
@@ -170,11 +171,63 @@ V2.prototype.toString = function() {
 	return "("+this.x+","+this.y+")";
 };
 
+class Wire {
+	constructor() { }
+	draw(ctx) {
+		this.drawAlgorithm(ctx);
+	}
+	drawLine(ctx) {
+		ctx.strokeStyle = this.color;
+		ctx.lineWidth = this.thickness;
+		ctx.beginPath();
+		ctx.moveTo(this.start.x, this.start.y);
+		ctx.lineTo(this.end.x, this.end.y);
+		ctx.stroke();
+	}
+	drawCircle(ctx) {
+		ctx.strokeStyle = this.color;
+		ctx.lineWidth = this.thickness;
+		ctx.beginPath();
+		ctx.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI);
+		ctx.stroke();
+	}
+	line(start, end, color = "black", thickness = 1) {
+		this.start = start; this.end = end; this.color = color; this.thickness = thickness;
+		this.drawAlgorithm = this.drawLine;
+	}
+	circle(center, radius, color = "black", thickness = 1) {
+		this.position = center; this.radius = radius; this.color = color; this.thickness = thickness;
+		this.drawAlgorithm = this.drawCircle;
+	}
+}
+
+class Wires {
+	constructor() {
+		this.wires = {};
+	}
+	make(name) {
+		let found = this.wires[name];
+		if (found) { return found; }
+		found = new Wire()
+		found.name = name;
+		this.wires[name] = found;
+		return found;
+	}
+	draw(ctx) {
+		for (const [key, value] of Object.entries(this.wires)) {
+			if (key.hidden) { continue; }
+			value.draw(ctx);
+		}
+	}
+}
+var WIRES = new Wires();
+
 class BasicSeekBehavior {
 	static update (agent, deltaTime) {
 		if (!agent.target) { return; }
 		//console.log(agent.target, agent.position);
 		let delta = V2.diff(agent.target, agent.position);
+		WIRES.make(this.name+"currentVelocity").line(agent.position, V2.sum(agent.position, agent.velocity), 'black');
 		let distance = delta.magnitude();
 		let currentSpeed = agent.velocity.magnitude();
 		let breakDistance = currentSpeed*currentSpeed / (2 * agent.acceleration);
@@ -183,11 +236,18 @@ class BasicSeekBehavior {
 		let desiredVelocity = null;
 		agent.stopDistance = breakDistance;
 		if (needToBreak) {
-			desiredVelocity = V2.prod(delta, currentSpeed / distance);// new V2();// V2.prod(direction, breakDistance / currentSpeed);
+			let directionAlignmentWithVelocity = V2.dot(direction, agent.velocity);
+			let velocityToRemove = V2.prod(direction, directionAlignmentWithVelocity);
+			desiredVelocity = V2.diff(agent.velocity, velocityToRemove);//V2.prod(delta, currentSpeed / distance);// new V2();// V2.prod(direction, breakDistance / currentSpeed);
 		} else {
 			desiredVelocity = V2.prod(direction, agent.speed);
 		}
-		let steeringForce = V2.diff(desiredVelocity, agent.velocity);
+		let endOfDesiredVelocity = V2.sum(agent.position, desiredVelocity);
+		let endOfCurrentVelocityOffset = V2.diff(endOfDesiredVelocity, V2.prod(agent.velocity, agent.acceleration));
+		WIRES.make(this.name+"desiredvelocity").line(agent.position, endOfDesiredVelocity, 'blue');
+		WIRES.make(this.name+"-currentvelocity").line(endOfDesiredVelocity, endOfCurrentVelocityOffset, 'gray');
+		let steeringForce = V2.diff(desiredVelocity, V2.prod(agent.velocity, agent.acceleration));
+		WIRES.make(this.name+"steeringVelocity").line(agent.position, V2.sum(agent.position, steeringForce), 'magenta');
 		let idealAcceleration = V2.diff(steeringForce, agent.velocity);
 		let accelerationMagnitude = idealAcceleration.magnitude();
 		let accelerationDirection = V2.quotient(idealAcceleration, accelerationMagnitude);
@@ -199,11 +259,13 @@ class BasicSeekBehavior {
 		} else {
 			agent.velocity = accelerationThisFrame;
 		}
+		WIRES.make(this.name+"target").circle(agent.target, 2);
 	}
 }
 
 class Agent {
-	constructor(x, y, radius, speed, acceleration, strokeColor, fillColor, borderThickness) {
+	constructor(name, x, y, radius, speed, acceleration, strokeColor, fillColor, borderThickness) {
+		this.name = name;
 		this.position = new V2(x,y);
 		this.velocity = new V2(0,0);
 		console.log(this.position);
@@ -240,6 +302,7 @@ class Agent {
 			ctx.arc(stopPosition.x, stopPosition.y, this.radius, 0, 2 * Math.PI);
 			ctx.stroke();
 		}
+		WIRES.draw(ctx);
 	}
 
 	update(deltaTime) {
@@ -277,9 +340,10 @@ class Agent {
 
 APP = new App();
 agents = [
-	new Agent(100, 100, 10, 100, 5, 'orange', 'red', 0.25),
-	new Agent(0,   0,   20, 50, 20, 'cyan', 'blue', 0.25)
+	new Agent("Red", 100, 100, 10, 100, 5, 'orange', 'red', 0.25),
+	//new Agent("Bluey", 0, 0, 20, 50, 20, 'cyan', 'blue', 0.25),
 ];
+WIRES.make("test").line(new V2(50,50), new V2(200,60), 'red');
 		</script>
 		<br>
 		could we implement <a href="https://www.red3d.com/cwr/steer/gdc99/">steering</a>
