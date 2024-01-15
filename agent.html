@@ -10,6 +10,7 @@
 var APP;
 var agents;
 var getPlayer = () => agents[0];
+var drawList = [];
 
 function forEachAgent(whatToDo) {
 	for (let i = 0; i < agents.length; i++) {
@@ -22,18 +23,6 @@ function mainLoop() {
 	APP.update();
 	APP.drawGame();
 	setTimeout(mainLoop, 10);
-}
-
-function mouseMoveInterrupt(e) {
-	APP.updateMousePosition(e || window.event);
-}
-
-function keyDownInterrupt(e) {
-	APP.updateKeyInput(e || window.event);
-}
-
-function mouseDownInterrupt(e) {
-	APP.updateMouseDownInput(e || window.event);
 }
 
 class App {
@@ -165,6 +154,11 @@ class V2 {
 		}
 		return this;
 	}
+	static lerp(a, b, p) {
+		let dx = b.x - a.x;
+		let dy = b.y - a.y;
+		return new V2(a.x + (dx * p), a.y + (dy * p));
+	}
 }
 
 V2.prototype.toString = function() {
@@ -221,45 +215,67 @@ class Wires {
 	}
 }
 var WIRES = new Wires();
+var DOT_TEST = 0;
 
 class BasicSeekBehavior {
 	static update (agent, deltaTime) {
 		if (!agent.target) { return; }
 		//console.log(agent.target, agent.position);
-		let delta = V2.diff(agent.target, agent.position);
+		WIRES.make(this.name+"target").circle(agent.target, 2);
 		WIRES.make(this.name+"currentVelocity").line(agent.position, V2.sum(agent.position, agent.velocity), 'black');
-		let distance = delta.magnitude();
+		let targetDelta = V2.diff(agent.target, agent.position);
+		let distance = targetDelta.magnitude();
+		let direction = V2.quotient(targetDelta, distance);
 		let currentSpeed = agent.velocity.magnitude();
-		let breakDistance = currentSpeed*currentSpeed / (2 * agent.acceleration);
-		let needToBreak = distance < breakDistance;
-		let direction = V2.quotient(delta, distance);
-		let desiredVelocity = null;
-		agent.stopDistance = breakDistance;
-		if (needToBreak) {
-			let directionAlignmentWithVelocity = V2.dot(direction, agent.velocity);
-			let velocityToRemove = V2.prod(direction, directionAlignmentWithVelocity);
-			desiredVelocity = V2.diff(agent.velocity, velocityToRemove);//V2.prod(delta, currentSpeed / distance);// new V2();// V2.prod(direction, breakDistance / currentSpeed);
-		} else {
-			desiredVelocity = V2.prod(direction, agent.speed);
+		let velocityDirection = V2.quotient(agent.velocity, currentSpeed);
+		let brakeDistance = currentSpeed*currentSpeed / (2 * agent.acceleration);
+		let stoppingVector = V2.prod(velocityDirection, brakeDistance);
+
+		WIRES.make(this.name+"brakedistance").line(agent.position, V2.sum(agent.position, stoppingVector), 'red');
+
+		//console.log(stoppingVector);
+
+		let forceEstimate = agent.velocity;
+		if (currentSpeed > 0) {
+			forceEstimate = stoppingVector;
 		}
-		let endOfDesiredVelocity = V2.sum(agent.position, desiredVelocity);
-		let endOfCurrentVelocityOffset = V2.diff(endOfDesiredVelocity, V2.prod(agent.velocity, agent.acceleration));
-		WIRES.make(this.name+"desiredvelocity").line(agent.position, endOfDesiredVelocity, 'blue');
-		WIRES.make(this.name+"-currentvelocity").line(endOfDesiredVelocity, endOfCurrentVelocityOffset, 'gray');
-		let steeringForce = V2.diff(desiredVelocity, V2.prod(agent.velocity, agent.acceleration));
-		WIRES.make(this.name+"steeringVelocity").line(agent.position, V2.sum(agent.position, steeringForce), 'magenta');
-		let idealAcceleration = V2.diff(steeringForce, agent.velocity);
-		let accelerationMagnitude = idealAcceleration.magnitude();
-		let accelerationDirection = V2.quotient(idealAcceleration, accelerationMagnitude);
-		let accelerationInOneSecond = V2.prod(accelerationDirection, agent.acceleration);
-		let accelerationThisFrame = V2.prod(accelerationInOneSecond, deltaTime);
-		//console.log(agent.target, agent.position, "delta:", delta, "dist:", distance, " dir:", direction, " acc:", idealAcceleration, accelerationThisFrame);
+
+		let desiredVelocityLookAhead = agent.speed;
+
+		let desiredVelocity = V2.prod(direction, agent.speed);
+
+		let desiredSteeringForce = V2.diff(desiredVelocity, forceEstimate);
+
+		let whereAmIGoing = desiredVelocity;
+		if (brakeDistance > 0) {
+			whereAmIGoing = V2.prod(direction, brakeDistance);
+			let hardSteeringForce = V2.diff(whereAmIGoing, forceEstimate);
+			let avg = V2.quotient(V2.sum(desiredVelocity, hardSteeringForce), 2);
+			let howAlignedIsVelocityAndTargetDirection = V2.dot(direction, velocityDirection);
+			if (howAlignedIsVelocityAndTargetDirection < currentSpeed / agent.speed) {
+				howAlignedIsVelocityAndTargetDirection = 0;
+			}
+			// the less aligned the directions, the more hard-steering will be done to get on course.
+			desiredSteeringForce = V2.lerp(hardSteeringForce, desiredVelocity, howAlignedIsVelocityAndTargetDirection);
+		}
+
+		let velocityEndPoint = V2.sum(agent.position, desiredVelocity);
+		let whereAmIGoingEndPoint = V2.sum(agent.position, whereAmIGoing);
+		WIRES.make(this.name+"desiredVelocity").line(agent.position, velocityEndPoint, 'blue');
+		WIRES.make(this.name+"currentVelocity").line(whereAmIGoingEndPoint, V2.diff(whereAmIGoingEndPoint, forceEstimate), 'gray');
+
+		let steeringDirection = desiredSteeringForce.normalized();
+		let actualSteeringForce = V2.prod(steeringDirection, agent.acceleration);
+
+		WIRES.make(this.name+"steeringforce").line(agent.position, V2.sum(agent.position, actualSteeringForce), 'magenta');
+
+		let accelerationThisFrame = V2.prod(actualSteeringForce, deltaTime);
 		if (agent.velocity) {
 			agent.velocity.add(accelerationThisFrame);
 		} else {
 			agent.velocity = accelerationThisFrame;
 		}
-		WIRES.make(this.name+"target").circle(agent.target, 2);
+		return;
 	}
 }
 
@@ -326,11 +342,7 @@ class Agent {
 
 	setTarget(x, y) {
 		this.target = new V2(x, y);
-		// let delta = V2.diff(this.target, this.position);
-		// let distance = delta.magnitude();
-		// let direction = V2.quotient(delta, distance);
-		// this.velocity = V2.prod(direction, this.speed);
-		console.log(this.fillColor, this.target, this.position);
+		//console.log(this.fillColor, this.target, this.position);
 	}
 
 	setEndOfLine(x, y) {
@@ -340,10 +352,36 @@ class Agent {
 
 APP = new App();
 agents = [
-	new Agent("Red", 100, 100, 10, 100, 5, 'orange', 'red', 0.25),
-	//new Agent("Bluey", 0, 0, 20, 50, 20, 'cyan', 'blue', 0.25),
+	new Agent("Red", 100, 100, 10, 200, 50, 'orange', 'red', 0.25),
+//	new Agent("Bluey", 0, 0, 20, 50, 20, 'cyan', 'blue', 0.25),
 ];
-WIRES.make("test").line(new V2(50,50), new V2(200,60), 'red');
+
+let testA = new V2(50,50);
+let testB = new V2(200,60);
+let testP = 0;
+WIRES.make("test").line(testA, testB, 'red');
+
+function mouseMoveInterrupt(e) {
+	APP.updateMousePosition(e || window.event);
+}
+
+function keyDownInterrupt(e) {
+	APP.updateKeyInput(e || window.event);
+	if (!e) { e = window.event; }
+	if (e.keyCode === 187) { // =
+		testP += 1/8;
+	}
+	if (e.keyCode === 189) { // -
+		testP -= 1/8;
+	}
+	let lerped = V2.lerp(testA, testB, testP);
+	console.log(testP);
+	WIRES.make("test circle").circle(lerped, 5);
+}
+
+function mouseDownInterrupt(e) {
+	APP.updateMouseDownInput(e || window.event);
+}
 		</script>
 		<br>
 		could we implement <a href="https://www.red3d.com/cwr/steer/gdc99/">steering</a>
