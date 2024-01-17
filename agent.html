@@ -22,7 +22,7 @@ function mainLoop() {
 	APP.processInput();
 	APP.update();
 	APP.drawGame();
-	setTimeout(mainLoop, 10);
+	setTimeout(mainLoop, APP.frameDelay);
 }
 
 class App {
@@ -31,7 +31,8 @@ class App {
 		this.now = Date.now();
 		console.log("creating "+this.now);
 		this.then = Date.now();
-		this.targetFps = 90;
+		this.targetFps = 30;
+		this.frameDelay = 1000/this.targetFps;
 		this.mouse = {x: 0, y: 0};
 		this.canvas.width = 800;
 		this.canvas.height = 600;
