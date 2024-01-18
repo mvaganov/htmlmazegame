@@ -258,10 +258,6 @@ class BasicSeekBehavior {
 			} else {
 				WIRES.make("STOP").circle(agent.position, agent.radius + 3, 'white');
 			}
-			//desiredVelocity = new V2(0,0);
-			//if (V2.isNan(desiredVelocity)) {
-			//	console.log(agent.name+" bad desiredVelocity "+desiredVelocity);
-			//}
 		}
 
 		let desiredSteeringForce = V2.diff(desiredVelocity, currentExpectedMovement);
