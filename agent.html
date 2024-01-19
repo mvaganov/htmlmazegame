@@ -146,7 +146,7 @@ class V2 {
 		} else if (typeof b === "object" && typeof a === "number") {
 			return new V2(b.x * a, b.y * a);
 		}
-		return this;
+		throw "can't multiply "+(typeof a)+" and "+(typeof b);
 	}
 	static quotient(a, b) {
 		       if (typeof a === "object" && typeof b === "object") {
@@ -278,7 +278,8 @@ class BasicSeekBehavior {
 			let hardSteeringForce = V2.diff(whereAmIGoing, currentExpectedMovement);
 			//let avg = V2.quotient(V2.sum(desiredVelocity, hardSteeringForce), 2);
 			let howAlignedIsVelocityAndTargetDirection = V2.dot(targetDirection, velocityDirection);
-			let steeringWasTheSameLastFrame = agent.lastSteeringForce != undefined && V2.dot(hardSteeringForce, desiredVelocity) > .9;
+			const dotIsCloseEnough = 15/16;
+			let steeringWasTheSameLastFrame = agent.lastSteeringForce != undefined && V2.dot(hardSteeringForce, desiredVelocity) > dotIsCloseEnough;
 			if (howAlignedIsVelocityAndTargetDirection < 0.9//currentSpeed / agent.speed
 			|| (steeringWasTheSameLastFrame && currentSpeed > 20)) {
 				howAlignedIsVelocityAndTargetDirection = 0;
@@ -303,6 +304,11 @@ class BasicSeekBehavior {
 			agent.velocity.add(accelerationThisFrame);
 		} else {
 			agent.velocity = accelerationThisFrame;
+		}
+		currentSpeed = agent.velocity.magnitude();
+		if (currentSpeed > agent.speed) {
+			velocityDirection = V2.quotient(agent.velocity, currentSpeed);
+			agent.velocity = V2.prod(velocityDirection, agent.speed);
 		}
 		return;
 	}
@@ -381,8 +387,8 @@ class Agent {
 
 APP = new App();
 agents = [
-	new Agent("Red", 100, 100, 10, 200, 50, 'orange', 'red', 0.25),
-	new Agent("Bluey", 0, 0, 20, 50, 20, 'cyan', 'blue', 0.25),
+	new Agent("Red", 100, 100, 10, 200, 20, 'orange', 'red', 0.25),
+	new Agent("Bluey", 0, 0, 20, 50, 100, 'cyan', 'blue', 0.25),
 ];
 
 let testA = new V2(50,50);
