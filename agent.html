@@ -107,10 +107,15 @@ class App {
 
 class V2 {
 	constructor(x = 0, y = 0) {
-		this.x = x; this.y = y;
+		if (y === undefined && typeof x === "object") {
+			this.x = x.x; this.y = x.y;
+		} else {
+			this.x = x; this.y = y;
+		}
 		this.assert();
 	}
 	assert() { if (this.x == undefined || this.y == undefined) { throw new Error("undefined values! " + this.toString()); } }
+	set(v) { this.x = v.x; this.y = v.y; this.assert(); return this; }
 	add(v) { this.x += v.x; this.y += v.y; this.assert(); return this; }
 	sub(v) { this.x -= v.x; this.y -= v.y; this.assert(); return this; }
 	mul(v) {
@@ -219,7 +224,7 @@ class Wires {
 var WIRES = new Wires();
 var DOT_TEST = 0;
 
-class BasicSeekBehavior {
+class SeekBehavior {
 	static update (agent, deltaTime) {
 		if (!agent.target) { return; }
 		//console.log(agent.target, agent.position);
@@ -230,86 +235,69 @@ class BasicSeekBehavior {
 		let targetDirection = V2.quotient(targetDelta, targetDistance);
 		let currentSpeed = agent.velocity.magnitude();
 		let velocityDirection = V2.quotient(agent.velocity, currentSpeed);
-		let brakeDistance = currentSpeed*currentSpeed / (2 * agent.acceleration);
-		let stoppingVector = V2.prod(velocityDirection, brakeDistance);
-
-		let brakePosition = V2.sum(agent.position, stoppingVector);
-		WIRES.make(agent.name+"brakedistance").line(agent.position, brakePosition, 'red');
-
-		//console.log(stoppingVector);
-
-		let currentExpectedMovement = agent.velocity;
-		if (currentSpeed > 0) {
-			currentExpectedMovement = stoppingVector;
-		}
-
-		let desiredVelocityLookAhead = agent.speed;
-
+		let useStopLogic = agent.targetEndingSpeed !== undefined;
+		let currentExpectedMovement = new V2(agent.velocity);
 		let desiredVelocity = V2.prod(targetDirection, agent.speed);
-
-		// TODO if we want to hit the brakes, set the desired velocity to zero... and find out what turns NaN!
-		let stopping = false;
-		if (brakeDistance > 0 && brakeDistance > targetDistance) {
-			let alignmentWithBrakes = V2.dot(targetDirection, velocityDirection);
-			if (alignmentWithBrakes > 0) {
-				WIRES.make("STOP").circle(agent.position, agent.radius + 3, 'red');
-				desiredVelocity = new V2(0,0);
-				stopping = true;
-			} else {
-				WIRES.make("STOP").circle(agent.position, agent.radius + 3, 'white');
-			}
-		}
-
-		let desiredSteeringForce = V2.diff(desiredVelocity, currentExpectedMovement);
-		let brakeColor = 'green';
 		let whereAmIGoing = desiredVelocity;
-		if (brakeDistance > 0 && brakeDistance > targetDistance) {
-			desiredSteeringForce = V2.diff(new V2(0,0), currentExpectedMovement);
-			if (V2.isNan(desiredSteeringForce)) {
-				console.log(agent.name+" bad desiredSteeringForce "+desiredSteeringForce);
-			}
-			brakeColor = 'red';
-			whereAmIGoing = new V2(0,0);
-		}
-		WIRES.make(agent.name+"brakeposition").circle(brakePosition, agent.radius, brakeColor);
+		let desiredSteeringForce= V2.diff(desiredVelocity, currentExpectedMovement);
 
-		if (!stopping && brakeDistance > 0) {
-			whereAmIGoing = V2.prod(targetDirection, brakeDistance);
-			let hardSteeringForce = V2.diff(whereAmIGoing, currentExpectedMovement);
-			//let avg = V2.quotient(V2.sum(desiredVelocity, hardSteeringForce), 2);
-			let howAlignedIsVelocityAndTargetDirection = V2.dot(targetDirection, velocityDirection);
-			const dotIsCloseEnough = 15/16;
-			let steeringWasTheSameLastFrame = agent.lastSteeringForce != undefined && V2.dot(hardSteeringForce, desiredVelocity) > dotIsCloseEnough;
-			if (howAlignedIsVelocityAndTargetDirection < 0.9//currentSpeed / agent.speed
-			|| (steeringWasTheSameLastFrame && currentSpeed > 20)) {
-				howAlignedIsVelocityAndTargetDirection = 0;
+		if (useStopLogic) {
+			let amountOfSpeedToStop = currentSpeed;
+			if (agent.targetEndingSpeed) {
+				amountOfSpeedToStop - agent.targetEndingSpeed;
 			}
-			// the less aligned the directions, the more hard-steering will be done to get on course.
-			desiredSteeringForce = V2.lerp(hardSteeringForce, desiredVelocity, howAlignedIsVelocityAndTargetDirection);
-			agent.lastSteeringForce = desiredSteeringForce;
+			let brakeDistance = amountOfSpeedToStop * amountOfSpeedToStop / (2 * agent.acceleration);
+			let stoppingVector = V2.prod(velocityDirection, brakeDistance);
+			let brakePosition = V2.sum(agent.position, stoppingVector);
+			WIRES.make(agent.name + "brakedistance").line(agent.position, brakePosition, 'red');
+			currentExpectedMovement.set(stoppingVector);
+			let stopping = false;
+			let desiredFinalVelocity = new V2(0,0);
+			if (agent.targetEndingSpeed) {
+				desiredFinalVelocity = V2.prod(targetDirection, agent.targetEndingSpeed);
+			}
+			if (brakeDistance > targetDistance) {
+				let alignmentWithBrakes = V2.dot(targetDirection, velocityDirection);
+				if (alignmentWithBrakes > 0) {
+					desiredVelocity = desiredFinalVelocity;
+					stopping = true;
+				}
+			}
+			let brakeColor = 'green';
+			if (brakeDistance > 0 && brakeDistance >= targetDistance) {
+				desiredSteeringForce.set(V2.diff(desiredFinalVelocity, currentExpectedMovement));
+				brakeColor = 'red';
+				whereAmIGoing = desiredFinalVelocity;
+			}
+			WIRES.make(agent.name + "brakeposition").circle(brakePosition, agent.radius, brakeColor);
+			if (!stopping) {
+				whereAmIGoing = V2.prod(targetDirection, brakeDistance);
+				let hardSteeringForce = V2.diff(whereAmIGoing, currentExpectedMovement);
+				const dotIsCloseEnough = 15/16;
+				let steeringIsInTheRightDirection = V2.dot(hardSteeringForce, desiredVelocity) > 1;
+				if (steeringIsInTheRightDirection) {
+					desiredSteeringForce.set(hardSteeringForce);
+				} else {
+					desiredSteeringForce.set(desiredVelocity);
+				}
+				agent.lastSteeringForce = desiredSteeringForce;
+			}
 		}
-
+		
 		let velocityEndPoint = V2.sum(agent.position, desiredVelocity);
 		let whereAmIGoingEndPoint = V2.sum(agent.position, whereAmIGoing);
-		WIRES.make(agent.name+"desiredVelocity").line(agent.position, velocityEndPoint, 'blue');
-		WIRES.make(agent.name+"currentVelocity").line(whereAmIGoingEndPoint, V2.diff(whereAmIGoingEndPoint, currentExpectedMovement), 'gray');
-
+		WIRES.make(agent.name + "desiredVelocity").line(agent.position, velocityEndPoint, 'blue');
+		WIRES.make(agent.name + "currentVelocity").line(whereAmIGoingEndPoint, V2.diff(whereAmIGoingEndPoint, currentExpectedMovement), 'gray');
 		let steeringDirection = desiredSteeringForce.normalized();
 		let actualSteeringForce = V2.prod(steeringDirection, agent.acceleration);
-
-		WIRES.make(agent.name+"steeringforce").line(agent.position, V2.sum(agent.position, actualSteeringForce), 'magenta');
-
+		WIRES.make(agent.name + "steeringforce").line(agent.position, V2.sum(agent.position, actualSteeringForce), 'magenta');
 		let accelerationThisFrame = V2.prod(actualSteeringForce, deltaTime);
 		if (agent.velocity) {
 			agent.velocity.add(accelerationThisFrame);
 		} else {
 			agent.velocity = accelerationThisFrame;
 		}
-		currentSpeed = agent.velocity.magnitude();
-		if (currentSpeed > agent.speed) {
-			velocityDirection = V2.quotient(agent.velocity, currentSpeed);
-			agent.velocity = V2.prod(velocityDirection, agent.speed);
-		}
+		agent.enforceSpeedLimit()
 		return;
 	}
 }
@@ -326,7 +314,7 @@ class Agent {
 		this.strokeColor = strokeColor;
 		this.fillColor = fillColor;
 		this.borderThickness = borderThickness;
-		this.behavior = BasicSeekBehavior;
+		this.behavior = SeekBehavior;
 	}
 
 	draw(ctx) {
@@ -377,11 +365,20 @@ class Agent {
 
 	setTarget(x, y) {
 		this.target = new V2(x, y);
+		this.targetEndingSpeed = 0;
 		//console.log(this.fillColor, this.target, this.position);
 	}
 
 	setEndOfLine(x, y) {
 		this.setTarget(x, y);
+	}
+
+	enforceSpeedLimit() {
+		let currentSpeed = this.velocity.magnitude();
+		if (currentSpeed > this.speed) {
+			let velocityDirection = V2.quotient(this.velocity, currentSpeed);
+			this.velocity = V2.prod(velocityDirection, this.speed);
+		}
 	}
 };
 
