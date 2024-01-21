@@ -7,6 +7,7 @@
 	</head>
 	<body onload="mainLoop()" onmousemove="mouseMoveInterrupt()" onkeydown="keyDownInterrupt()" onmousedown="mouseDownInterrupt()">
 		<script>
+const DRAWMATH = true;
 var APP;
 var agents;
 var getPlayer = () => agents[0];
@@ -114,8 +115,10 @@ class V2 {
 		}
 		this.assert();
 	}
-	assert() { if (this.x == undefined || this.y == undefined) { throw new Error("undefined values! " + this.toString()); } }
-	set(v) { this.x = v.x; this.y = v.y; this.assert(); return this; }
+	isZero() { return this.x === 0 && this.y === 0; }
+	assert() { if (this.x === undefined || this.y === undefined) { throw new Error("undefined values! " + this.toString()); } }
+	set(x,y) { this.x = x; this.y = y; this.assert(); return this; }
+	copy(v) { this.x = v.x; this.y = v.y; this.assert(); return this; }
 	add(v) { this.x += v.x; this.y += v.y; this.assert(); return this; }
 	sub(v) { this.x -= v.x; this.y -= v.y; this.assert(); return this; }
 	mul(v) {
@@ -228,9 +231,14 @@ class SeekBehavior {
 	static update (agent, deltaTime) {
 		if (!agent.target) { return; }
 		//console.log(agent.target, agent.position);
-		WIRES.make(agent.name+"target").circle(agent.target, 2);
-		WIRES.make(agent.name+"currentVelocity").line(agent.position, V2.sum(agent.position, agent.velocity), 'black');
+		WIRES.make(agent.name + "target").circle(agent.target, 2);
+		if (DRAWMATH) {
+			WIRES.make(agent.name + "currentVelocity").line(agent.position, V2.sum(agent.position, agent.velocity), 'black');
+		}
 		let targetDelta = V2.diff(agent.target, agent.position);
+		if (targetDelta.isZero() && agent.velocity.isZero()) {
+			return;
+		}
 		let targetDistance = targetDelta.magnitude();
 		let targetDirection = V2.quotient(targetDelta, targetDistance);
 		let currentSpeed = agent.velocity.magnitude();
@@ -248,9 +256,11 @@ class SeekBehavior {
 			}
 			let brakeDistance = amountOfSpeedToStop * amountOfSpeedToStop / (2 * agent.acceleration);
 			let stoppingVector = V2.prod(velocityDirection, brakeDistance);
-			let brakePosition = V2.sum(agent.position, stoppingVector);
-			WIRES.make(agent.name + "brakedistance").line(agent.position, brakePosition, 'red');
-			currentExpectedMovement.set(stoppingVector);
+			if (DRAWMATH) {
+				let brakePosition = V2.sum(agent.position, stoppingVector);
+				WIRES.make(agent.name + "brakedistance").line(agent.position, brakePosition, 'red');
+			}
+			currentExpectedMovement.copy(stoppingVector);
 			let stopping = false;
 			let desiredFinalVelocity = new V2(0,0);
 			if (agent.targetEndingSpeed) {
@@ -263,36 +273,45 @@ class SeekBehavior {
 					stopping = true;
 				}
 			}
-			let brakeColor = 'green';
-			if (brakeDistance > 0 && brakeDistance >= targetDistance) {
-				desiredSteeringForce.set(V2.diff(desiredFinalVelocity, currentExpectedMovement));
-				brakeColor = 'red';
+			let needsToBrake = brakeDistance > 0 && brakeDistance >= targetDistance;
+			if (needsToBrake) {
+				desiredSteeringForce.copy(V2.diff(desiredFinalVelocity, currentExpectedMovement));
 				whereAmIGoing = desiredFinalVelocity;
 			}
-			WIRES.make(agent.name + "brakeposition").circle(brakePosition, agent.radius, brakeColor);
+			if (DRAWMATH) {
+				let brakeColor = needsToBrake ? 'red' : 'green';
+				let brakePosition = V2.sum(agent.position, stoppingVector);
+				WIRES.make(agent.name + "brakeposition").circle(brakePosition, agent.radius, brakeColor);
+			}
 			if (!stopping) {
 				whereAmIGoing = V2.prod(targetDirection, brakeDistance);
 				let hardSteeringForce = V2.diff(whereAmIGoing, currentExpectedMovement);
 				const dotIsCloseEnough = 15/16;
 				let steeringIsInTheRightDirection = V2.dot(hardSteeringForce, desiredVelocity) > 1;
 				if (steeringIsInTheRightDirection) {
-					desiredSteeringForce.set(hardSteeringForce);
+					desiredSteeringForce.copy(hardSteeringForce);
 				} else {
-					desiredSteeringForce.set(desiredVelocity);
+					desiredSteeringForce.copy(desiredVelocity);
 				}
 				agent.lastSteeringForce = desiredSteeringForce;
 			}
 		}
 		
-		let velocityEndPoint = V2.sum(agent.position, desiredVelocity);
-		let whereAmIGoingEndPoint = V2.sum(agent.position, whereAmIGoing);
-		WIRES.make(agent.name + "desiredVelocity").line(agent.position, velocityEndPoint, 'blue');
-		WIRES.make(agent.name + "currentVelocity").line(whereAmIGoingEndPoint, V2.diff(whereAmIGoingEndPoint, currentExpectedMovement), 'gray');
 		let steeringDirection = desiredSteeringForce.normalized();
-		let actualSteeringForce = V2.prod(steeringDirection, agent.acceleration);
-		WIRES.make(agent.name + "steeringforce").line(agent.position, V2.sum(agent.position, actualSteeringForce), 'magenta');
-		let accelerationThisFrame = V2.prod(actualSteeringForce, deltaTime);
-		if (agent.velocity) {
+		if (DRAWMATH) {
+			let actualSteeringForce = V2.prod(steeringDirection, agent.acceleration);
+			let velocityEndPoint = V2.sum(agent.position, desiredVelocity);
+			let whereAmIGoingEndPoint = V2.sum(agent.position, whereAmIGoing);
+			WIRES.make(agent.name + "desiredVelocity").line(agent.position, velocityEndPoint, 'blue');
+			WIRES.make(agent.name + "currentVelocity").line(whereAmIGoingEndPoint, V2.diff(whereAmIGoingEndPoint, currentExpectedMovement), 'gray');
+			WIRES.make(agent.name + "steeringforce").line(agent.position, V2.sum(agent.position, actualSteeringForce), 'magenta');
+		}
+		let actualForceThisFrame = agent.acceleration * deltaTime;
+		let accelerationThisFrame = V2.prod(steeringDirection, actualForceThisFrame);
+		if (targetDistance <= actualForceThisFrame) {
+			agent.velocity.set(0, 0);
+			agent.position = agent.target;
+		} else  if (agent.velocity) {
 			agent.velocity.add(accelerationThisFrame);
 		} else {
 			agent.velocity = accelerationThisFrame;
@@ -303,11 +322,10 @@ class SeekBehavior {
 }
 
 class Agent {
-	constructor(name, x, y, radius, speed, acceleration, strokeColor, fillColor, borderThickness) {
+	constructor(name, position, radius, speed, acceleration, fillColor, strokeColor, borderThickness) {
 		this.name = name;
-		this.position = new V2(x,y);
+		this.position = position;
 		this.velocity = new V2(0,0);
-		console.log(this.position);
 		this.radius = radius;
 		this.speed = speed;
 		this.acceleration = acceleration;
@@ -328,9 +346,9 @@ class Agent {
 			ctx.fillStyle = this.fillColor;
 			ctx.fill();
 		}
-		ctx.moveTo(this.position.x, this.position.y);
-		let endPoint = V2.sum(this.position, this.velocity);
-		ctx.lineTo(endPoint.x, endPoint.y);
+		//ctx.moveTo(this.position.x, this.position.y);
+		//let endPoint = V2.sum(this.position, this.velocity);
+		//ctx.lineTo(endPoint.x, endPoint.y);
 		ctx.stroke();
 		if (this.stopDistance) {
 			let moveDir = this.velocity.normalized();
@@ -384,8 +402,8 @@ class Agent {
 
 APP = new App();
 agents = [
-	new Agent("Red", 100, 100, 10, 200, 20, 'orange', 'red', 0.25),
-	new Agent("Bluey", 0, 0, 20, 50, 100, 'cyan', 'blue', 0.25),
+	new Agent("Bluey", new V2(0,0), 20, 50, 100, 'cyan', 'blue', 0.25),
+	new Agent("Red", new V2(100,100), 10, 200, 20, 'orange', 'red', 0.25),
 ];
 
 let testA = new V2(50,50);
