@@ -7,7 +7,7 @@
 	</head>
 	<body onload="mainLoop()" onmousemove="mouseMoveInterrupt()" onkeydown="keyDownInterrupt()" onmousedown="mouseDownInterrupt()">
 		<script>
-const DRAWMATH = true;
+let DRAWMATH = false;
 var APP;
 var agents;
 var getPlayer = () => agents[0];
@@ -76,11 +76,14 @@ class App {
 	drawGame() {
 		this.clear();
 		this.ctx = this.canvas.getContext("2d");
-		this.ctx.font = "30px Arial";
-		this.ctx.fillStyle = "#0f0";
-		this.ctx.textAlign = "center";
-		this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
+		// this.ctx.font = "30px Arial";
+		// this.ctx.fillStyle = "#0f0";
+		// this.ctx.textAlign = "center";
+		// this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
 		forEachAgent(a => a.draw(this.ctx));
+		if (DRAWMATH) {
+			WIRES.draw(this.ctx);
+		}
 	}
 
 	update() {
@@ -88,6 +91,10 @@ class App {
 		let timeHasPassed = this.deltaTime > 0;
 		if (timeHasPassed) { 
 			let deltatime = this.deltaTime / 1000;
+			// TODO separate the update into 2 stages: 
+			// * calculating physics
+			// * moving to calculated spot. if new spot collides
+			//   * calculate new position based on mass
 			forEachAgent(a => a.update(deltatime));
 		}
 	}
@@ -168,6 +175,11 @@ class V2 {
 		let dx = b.x - a.x;
 		let dy = b.y - a.y;
 		return new V2(a.x + (dx * p), a.y + (dy * p));
+	}
+	static distance(a, b) {
+		let x = a.x-b.x;
+		let y = a.y-b.y;
+		return Math.sqrt(x*x+y*y);
 	}
 }
 
@@ -308,21 +320,24 @@ class SeekBehavior {
 		}
 		let actualForceThisFrame = agent.acceleration * deltaTime;
 		let accelerationThisFrame = V2.prod(steeringDirection, actualForceThisFrame);
-		if (targetDistance <= actualForceThisFrame) {
-			agent.velocity.set(0, 0);
-			agent.position = agent.target;
-		} else  if (agent.velocity) {
+		if (agent.velocity) {
 			agent.velocity.add(accelerationThisFrame);
 		} else {
 			agent.velocity = accelerationThisFrame;
 		}
-		agent.enforceSpeedLimit()
+
+		if (targetDistance < actualForceThisFrame && currentSpeed < actualForceThisFrame/4) {
+			agent.velocity.set(0, 0);
+			agent.position = agent.target;
+		} else {
+			agent.enforceSpeedLimit();
+		}
 		return;
 	}
 }
 
 class Agent {
-	constructor(name, position, radius, speed, acceleration, fillColor, strokeColor, borderThickness) {
+	constructor(name, position, radius, speed, acceleration, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
 		this.name = name;
 		this.position = position;
 		this.velocity = new V2(0,0);
@@ -359,7 +374,6 @@ class Agent {
 			ctx.arc(stopPosition.x, stopPosition.y, this.radius, 0, 2 * Math.PI);
 			ctx.stroke();
 		}
-		WIRES.draw(ctx);
 	}
 
 	update(deltaTime) {
@@ -376,7 +390,6 @@ class Agent {
 		}
 		if (this.velocity) {
 			let movedThisFrame = V2.prod(this.velocity, deltaTime);
-			//console.log(this.position, movedThisFrame);
 			this.position.add(movedThisFrame);
 		}
 	}
@@ -398,18 +411,25 @@ class Agent {
 			this.velocity = V2.prod(velocityDirection, this.speed);
 		}
 	}
+
+	collision(agent0, agent1) {
+		let sumRadius = agent0.radius + agent1.radius;
+		let distance = V2.distance(agent0.position, agent1.position);
+		return (sumRadius > distance);
+	}
 };
 
 APP = new App();
 agents = [
-	new Agent("Bluey", new V2(0,0), 20, 50, 100, 'cyan', 'blue', 0.25),
-	new Agent("Red", new V2(100,100), 10, 200, 20, 'orange', 'red', 0.25),
+	new Agent("Bluey", new V2(0,0), 20, 50, 100, 5, 'cyan', 'blue', 0.25),
+	new Agent("Red", new V2(100,100), 10, 200, 20, 10, 'orange', 'red', 0.25),
+	new Agent("gray", new V2(40,300), 8, 100, 50),
 ];
 
-let testA = new V2(50,50);
-let testB = new V2(200,60);
-let testP = 0;
-WIRES.make("test").line(testA, testB, 'red');
+//let testA = new V2(50,50);
+//let testB = new V2(200,60);
+//let testP = 0;
+//WIRES.make("test").line(testA, testB, 'red');
 
 function mouseMoveInterrupt(e) {
 	APP.updateMousePosition(e || window.event);
@@ -424,9 +444,12 @@ function keyDownInterrupt(e) {
 	if (e.keyCode === 189) { // -
 		testP -= 1/8;
 	}
-	let lerped = V2.lerp(testA, testB, testP);
-	console.log(testP);
-	WIRES.make("test circle").circle(lerped, 5);
+	if (e.keyCode === 32) { 
+		DRAWMATH = !DRAWMATH;
+	}
+	//let lerped = V2.lerp(testA, testB, testP);
+	//console.log(testP);
+	//WIRES.make("test circle").circle(lerped, 5);
 }
 
 function mouseDownInterrupt(e) {
