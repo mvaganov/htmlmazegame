@@ -13,6 +13,29 @@ var agents;
 var getPlayer = () => agents[0];
 var drawList = [];
 
+var collisionHappening = function (agent) {
+	let listOfCollisions = null;
+	for (var i = 0; i < agents.length; i++) {
+		let a = agents[i];
+		if (a == agent) {
+			continue;
+		}
+		if (!a) {
+			console.log("null agent? "+i);
+			continue;
+		}
+		let collisionData = Agent.collision(agent, a);
+		if (collisionData != null) {
+			if (listOfCollisions == null) {
+				listOfCollisions = [collisionData];
+			} else {
+				listOfCollisions.push(collisionData);
+			}
+		}
+	}
+	return listOfCollisions;
+}
+
 function forEachAgent(whatToDo) {
 	for (let i = 0; i < agents.length; i++) {
 		whatToDo(agents[i]);
@@ -91,11 +114,33 @@ class App {
 		let timeHasPassed = this.deltaTime > 0;
 		if (timeHasPassed) { 
 			let deltatime = this.deltaTime / 1000;
-			// TODO separate the update into 2 stages: 
-			// * calculating physics
-			// * moving to calculated spot. if new spot collides
-			//   * calculate new position based on mass
 			forEachAgent(a => a.update(deltatime));
+			forEachAgent(a => a.updateApplyPhysics(deltatime));
+			let collisionsPerAgent = {};
+			forEachAgent(a => {
+				let collisions = collisionHappening(a);
+				if (collisions != null) {
+					let collisionsHappeningToAgent = collisionsPerAgent[a.name];
+					if (!collisionsHappeningToAgent) {
+						collisionsHappeningToAgent = [];
+					}
+					for (let i = 0; i < collisions.length; i++) {
+						collisionsHappeningToAgent.push(collisions[i]);
+					}
+					collisionsPerAgent[a.name] = collisionsHappeningToAgent;
+				}
+			});
+			for (let agentname in collisionsPerAgent) {
+				let collisions = collisionsPerAgent[agentname];
+				let collisionAdjustment = new V2(0,0);
+				for(let i = 0; i < collisions.length; i++) {
+					let collision = collisions[i];
+					collisionAdjustment.add(collision.resolution[0]);
+				}
+				collisionAdjustment.div(collisions.length);
+				let agent = collisions[0].agent[0];
+				agent.position.add(collisionAdjustment);
+			}
 		}
 	}
 
@@ -239,6 +284,22 @@ class Wires {
 var WIRES = new Wires();
 var DOT_TEST = 0;
 
+class BasicBehavior {
+	static update (agent, deltaTime) {
+		if (agent.target) {
+			WIRES.make(agent.name + "target").circle(agent.target, 2);
+			let delta = V2.diff(agent.target, agent.position);
+			let distance = delta.magnitude();
+			if (distance < agent.radius) {
+				agent.velocity = new V2(0,0);
+			} else {
+				let direction = V2.quotient(delta, distance);
+				agent.velocity = V2.prod(direction, agent.speed);
+			}
+		}
+	}
+}
+
 class SeekBehavior {
 	static update (agent, deltaTime) {
 		if (!agent.target) { return; }
@@ -343,6 +404,7 @@ class Agent {
 		this.velocity = new V2(0,0);
 		this.radius = radius;
 		this.speed = speed;
+		this.mass = mass;
 		this.acceleration = acceleration;
 		this.strokeColor = strokeColor;
 		this.fillColor = fillColor;
@@ -380,14 +442,11 @@ class Agent {
 		if (this.behavior) {
 			this.behavior.update(this, deltaTime);
 		} else {
-			if (this.target) {
-				let delta = V2.diff(this.target, this.position);
-				let distance = delta.magnitude();
-				if (distance < this.radius) {
-					this.velocity = new V2(0,0);
-				}
-			}
+			BasicBehavior.update(this, deltaTime);
 		}
+	}
+
+	updateApplyPhysics(deltaTime) {
 		if (this.velocity) {
 			let movedThisFrame = V2.prod(this.velocity, deltaTime);
 			this.position.add(movedThisFrame);
@@ -412,10 +471,26 @@ class Agent {
 		}
 	}
 
-	collision(agent0, agent1) {
+	static collision(agent0, agent1) {
 		let sumRadius = agent0.radius + agent1.radius;
-		let distance = V2.distance(agent0.position, agent1.position);
-		return (sumRadius > distance);
+		let delta = V2.diff(agent1.position, agent0.position);
+		let distance = delta.magnitude();
+		if (sumRadius > distance) {
+			let overlap = sumRadius - distance;
+			let direction = V2.quotient(delta, distance);
+			let totalMass = agent0.mass + agent1.mass;
+			let offset0 = -overlap*agent1.mass/totalMass;
+			let offset1 = overlap*agent0.mass/totalMass;
+			let resolution0 = V2.prod(direction, offset0);
+			let resolution1 = V2.prod(direction, offset1);
+			let collisionData = {
+				agent: [ agent0, agent1 ],
+				position: [ agent0.position, agent1.position ],
+				resolution: [ resolution0, resolution1 ]
+			};
+			return collisionData;
+		}
+		return null;
 	}
 };
 
@@ -425,11 +500,6 @@ agents = [
 	new Agent("Red", new V2(100,100), 10, 200, 20, 10, 'orange', 'red', 0.25),
 	new Agent("gray", new V2(40,300), 8, 100, 50),
 ];
-
-//let testA = new V2(50,50);
-//let testB = new V2(200,60);
-//let testP = 0;
-//WIRES.make("test").line(testA, testB, 'red');
 
 function mouseMoveInterrupt(e) {
 	APP.updateMousePosition(e || window.event);
@@ -447,9 +517,6 @@ function keyDownInterrupt(e) {
 	if (e.keyCode === 32) { 
 		DRAWMATH = !DRAWMATH;
 	}
-	//let lerped = V2.lerp(testA, testB, testP);
-	//console.log(testP);
-	//WIRES.make("test circle").circle(lerped, 5);
 }
 
 function mouseDownInterrupt(e) {
