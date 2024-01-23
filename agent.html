@@ -21,7 +21,7 @@ var collisionHappening = function (agent) {
 			continue;
 		}
 		if (!a) {
-			console.log("null agent? "+i);
+			console.log("null agent? " + i);
 			continue;
 		}
 		let collisionData = Agent.collision(agent, a);
@@ -53,10 +53,10 @@ class App {
 	constructor() {
 		this.canvas = document.createElement("canvas");
 		this.now = Date.now();
-		console.log("creating "+this.now);
+		console.log("creating " + this.now);
 		this.then = Date.now();
 		this.targetFps = 30;
-		this.frameDelay = 1000/this.targetFps;
+		this.frameDelay = 1000 / this.targetFps;
 		this.mouse = {x: 0, y: 0};
 		this.canvas.width = 800;
 		this.canvas.height = 600;
@@ -70,7 +70,7 @@ class App {
 		if (e.keyCode === ESCAPE) {
 			this.clearScreen = true;
 		} else {
-			console.log("key: "+e.keyCode)
+			console.log("key: " + e.keyCode)
 		}
 	};
 
@@ -107,6 +107,7 @@ class App {
 		if (DRAWMATH) {
 			WIRES.draw(this.ctx);
 		}
+		speechBubble(this.ctx, "this is\na test of text rendering\nwoah\nlol", agents[0].position, agents[1].position, agents[1].strokeColor);
 	}
 
 	update() {
@@ -159,8 +160,10 @@ class App {
 };
 
 class V2 {
-	constructor(x = 0, y = 0) {
-		if (y === undefined && typeof x === "object") {
+	constructor(x = 0, y = undefined) {
+		if (x === 0 && y === undefined) {
+			this.x = 0; this.y = 0;
+		} else if (y === undefined && typeof x === "object") {
 			this.x = x.x; this.y = x.y;
 		} else {
 			this.x = x; this.y = y;
@@ -197,6 +200,7 @@ class V2 {
 	static sum(a, b) { return new V2(a.x + b.x, a.y + b.y); }
 	static diff(a, b) { return new V2(a.x - b.x, a.y - b.y); }
 	static dot(a, b) { return a.x * b.x + a.y * b.y; }
+	static sign(a, b) { return a.x * b.y - a.y * b.x; }
 	static isNan(v) { return !v.x || !v.y; }
 	static prod(a, b) {
 		       if (typeof a === "object" && typeof b === "object") {
@@ -517,6 +521,96 @@ function keyDownInterrupt(e) {
 	if (e.keyCode === 32) { 
 		DRAWMATH = !DRAWMATH;
 	}
+}
+
+function getTextRectSize(ctx, text) {
+	let metrics = ctx.measureText(text);
+	let fontHeight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
+	let actualHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+	let actualWidth = ctx.measureText(text).width;
+	return new V2(actualWidth, actualHeight);
+}
+
+function speechBubble(ctx, text, position, speechSource, bubbleLine = '#888', bubbleColor = '#fffa', textColor = '#222') {
+	ctx.font = "12px Arial";
+	ctx.textAlign = "center";
+	let metrics = ctx.measureText(text);
+	let line = text.split("\n");
+	let totalRect = new V2(0,0);
+	let lineRects = [];
+	let lineSpacing = 5;
+	for(let i = 0; i < line.length; i++) {
+		if (i > 0) {
+			totalRect.y += lineSpacing;
+		}
+		let lineSize = getTextRectSize(ctx, line[i]);
+		lineRects.push(lineSize);
+		if (totalRect.x < lineSize.x) {
+			totalRect.x = lineSize.x;
+		}
+		totalRect.y += lineSize.y;
+	}
+	let p = new V2(position);
+	let extraSize = V2.prod(totalRect, 0.125);
+	//p.add(extraSize);
+	totalRect.add(extraSize);
+	ctx.strokeStyle = bubbleLine;
+	ctx.fillStyle = bubbleColor;
+	drawOvalWordBubble(ctx, p, totalRect, speechSource);
+	p.y += extraSize.y/2;
+	let cursor = V2.diff(p, new V2(0, totalRect.y/2));
+	const descentOffset = metrics.fontBoundingBoxDescent/2;
+	for (let i = 0; i < line.length; ++i) {
+		let lineSize = lineRects[i];//getTextRectSize(ctx, line[i]);
+		// ctx.strokeStyle = '#fff4';
+		// ctx.fillStyle = "#fff";
+		// ctx.beginPath();
+		// ctx.rect(cursor.x - lineSize.x/2, cursor.y + descentOffset, lineSize.x, lineSize.y);
+		// ctx.fill();
+		// ctx.stroke();
+		ctx.fillStyle = textColor;
+		ctx.fillText(line[i], cursor.x, cursor.y + lineSize.y);
+		cursor.y += lineSize.y + lineSpacing;
+	}
+}
+
+var circle32 = [];
+for (let i = 0; i < Math.PI * 2; i += Math.PI/16) {
+	circle32.push(new V2(Math.cos(i)/2, Math.sin(i)/2));
+}
+
+function createOval(center, size) {
+	let points = [];
+	for(let i = 0; i < 32; ++i) {
+		points.push(V2.prod(circle32[i], size));
+	}
+	return points;
+}
+
+function drawOvalWordBubble(ctx, center, size, source) {
+	ctx.beginPath();
+	let last = circle32.length-1;
+	let x = circle32[last].x * size.x;
+	let y = circle32[last].y * size.y;
+	ctx.moveTo(x + center.x, y + center.y)
+	let lastPoint = new V2(x,y);
+	let thisPoint = new V2(x,y);
+	let toSource = V2.diff(source, center);
+	let lastSign = V2.sign(toSource, thisPoint) > 0;
+	for(let i = 0; i < 32; ++i) {
+		x = circle32[i].x * size.x;
+		y = circle32[i].y * size.y;
+		thisPoint.set(x,y);
+		let thisSign = V2.sign(toSource, thisPoint) > 0;
+		if (lastSign != thisSign && V2.dot(thisPoint, toSource) > 0) {
+			ctx.lineTo(source.x, source.y);
+		}
+		lastSign = thisSign;
+		ctx.lineTo(x + center.x, y + center.y);
+		lastPoint.set(x, y);
+	}
+	ctx.fill();
+	ctx.stroke();
 }
 
 function mouseDownInterrupt(e) {
