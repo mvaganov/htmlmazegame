@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	<style>
+		body { margin:0; padding:0; }
+	</style>
+	</head>
+	<body onload="mainLoop()" onmousemove="mouseMoveInterrupt()" onkeydown="keyDownInterrupt()" onmousedown="mouseDownInterrupt()">
+		<script>
+// -10 wtf			
+// -2 bruh
+// -1 kek
+// 0 ...
+// 1 heh
+// 2 hah
+// 3 ha ha
+// 4 haha
+// 5 lol
+// 6 haha lol
+// 7 ahaha
+// 8 rofl
+// 9 lololol
+// 10 omgroflhahaha
+
+// 0 ...
+// 5 that's funny.
+// 8 bro that's really good.
+// 10 dude you are hilarious.
+
+// presentation/delivery - confidence, tone of voice, consistency and legibility of speech
+// categoryA - poitics
+// categoryB - sex
+// categoryC - relationships
+// categoryD - prejudice and other cognitive biases
+// prophecy - saying what other people wish they had thought of
+
+// comedian type
+// * coincidental - the coincidental comedian sees something, reads something or hears something and turns it into a joke in that moment.
+// * architect
+// * humorost
+
+// laughter triggers:
+// - Surprise
+//     Surprise or Twist: Many jokes rely on surprising the audience with an unexpected punchline or twist. The element of surprise can catch people off guard and generate laughter.
+// - Superiority
+//     Laughing at the misfortune of others
+// - Embarrassment
+//     make the audience feel embarassed and laugh as a coping mechanism
+// - Incongruity
+//     Incongruity: Jokes often involve bringing together seemingly unrelated or incompatible elements, creating a contrast that triggers laughter. The unexpected combination can be funny.
+// - Recognition
+// - Release
+//     At least nobody died.
+// - Configurational
+// - Ambivalence
+// - Coincidence
+// - Benign Violations
+//     it's bad but harmless. Tragedy + Time
+
+
+// Timing: Timing is crucial in comedy. The delivery of a joke, including pauses and pacing, can significantly impact its comedic effect. Well-timed punchlines tend to be funnier.
+// Relatability: Jokes that touch on shared experiences or common situations are often funnier because people can relate to them. Understanding the context allows individuals to connect with the humor.
+// Wordplay and Puns: Clever wordplay, puns, and linguistic humor can be amusing. Playing with language, double meanings, or creating unexpected connections between words can elicit laughter.
+// Exaggeration: Overstating or exaggerating situations, characteristics, or behaviors can be humorous. It often involves taking something to an extreme, making it absurd and comical.
+// Observational Comedy: Comedians often find humor in everyday situations by providing a unique or humorous perspective on common experiences, highlighting the absurdities in daily life.
+// Satire and Irony: Satirical humor involves mocking or ridiculing people, institutions, or societal norms. Irony, where there is a contrast between expectations and reality, can also be comedic.
+// Self-Deprecation: Jokes that involve poking fun at oneself or one's own flaws can be relatable and endearing. It creates a sense of humility that resonates with audiences.
+// Cultural and Social Context: Understanding cultural references and social context is crucial for some jokes. Humor that taps into shared cultural knowledge can be more effective within specific groups.
+
+let DRAWMATH = false;
+var APP;
+var agents;
+var getPlayer = () => agents[0];
+var drawList = [];
+
+var collisionHappening = function (agent) {
+	let listOfCollisions = null;
+	for (var i = 0; i < agents.length; i++) {
+		let a = agents[i];
+		if (a == agent) {
+			continue;
+		}
+		if (!a) {
+			console.log("null agent? " + i);
+			continue;
+		}
+		let collisionData = Agent.collision(agent, a);
+		if (collisionData != null) {
+			if (listOfCollisions == null) {
+				listOfCollisions = [collisionData];
+			} else {
+				listOfCollisions.push(collisionData);
+			}
+		}
+	}
+	return listOfCollisions;
+}
+
+function forEachAgent(whatToDo) {
+	for (let i = 0; i < agents.length; i++) {
+		whatToDo(agents[i]);
+	}
+}
+
+function mainLoop() {
+	APP.processInput();
+	APP.update();
+	APP.drawGame();
+	setTimeout(mainLoop, APP.frameDelay);
+}
+
+class App {
+	constructor() {
+		this.canvas = document.createElement("canvas");
+		this.now = Date.now();
+		console.log("creating " + this.now);
+		this.then = Date.now();
+		this.targetFps = 30;
+		this.frameDelay = 1000 / this.targetFps;
+		this.mouse = {x: 0, y: 0};
+		this.canvas.width = 800;
+		this.canvas.height = 600;
+		this.context = this.canvas.getContext("2d");
+		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+		document.onkeydown = this.userkey;
+	}
+
+	updateKeyInput(e) {
+		const ESCAPE = 27;
+		if (e.keyCode === ESCAPE) {
+			this.clearScreen = true;
+		} else {
+			console.log("key: " + e.keyCode)
+		}
+	};
+
+	updateMousePosition(e) {
+		if (!e) {
+			return;
+		}
+		this.mouse.x = e.clientX;
+		this.mouse.y = e.clientY;
+	}
+
+	updateMouseDownInput(e) {
+		this.updateMousePosition(e);
+		forEachAgent(a => a.setEndOfLine(this.mouse.x, this.mouse.y));
+	}
+
+	processInput() {
+		if (this.mouse) {
+		}
+		if (this.clearScreen) {
+			this.clear();
+			this.clearScreen = false;
+		}
+	}
+
+	drawGame() {
+		this.clear();
+		this.ctx = this.canvas.getContext("2d");
+		// this.ctx.font = "30px Arial";
+		// this.ctx.fillStyle = "#0f0";
+		// this.ctx.textAlign = "center";
+		// this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
+		forEachAgent(a => a.draw(this.ctx));
+		if (DRAWMATH) {
+			WIRES.draw(this.ctx);
+		}
+		speechBubble(this.ctx, "this is\na test of text rendering\nwoah\nlol", agents[0].position, agents[1].position, agents[1].strokeColor);
+	}
+
+	update() {
+		this.updateTiming();
+		let timeHasPassed = this.deltaTime > 0;
+		if (timeHasPassed) { 
+			let deltatime = this.deltaTime / 1000;
+			forEachAgent(a => a.update(deltatime));
+			forEachAgent(a => a.updateApplyPhysics(deltatime));
+			let collisionsPerAgent = {};
+			forEachAgent(a => {
+				let collisions = collisionHappening(a);
+				if (collisions != null) {
+					let collisionsHappeningToAgent = collisionsPerAgent[a.name];
+					if (!collisionsHappeningToAgent) {
+						collisionsHappeningToAgent = [];
+					}
+					for (let i = 0; i < collisions.length; i++) {
+						collisionsHappeningToAgent.push(collisions[i]);
+					}
+					collisionsPerAgent[a.name] = collisionsHappeningToAgent;
+				}
+			});
+			for (let agentname in collisionsPerAgent) {
+				let collisions = collisionsPerAgent[agentname];
+				let collisionAdjustment = new V2(0,0);
+				for(let i = 0; i < collisions.length; i++) {
+					let collision = collisions[i];
+					collisionAdjustment.add(collision.resolution[0]);
+				}
+				collisionAdjustment.div(collisions.length);
+				let agent = collisions[0].agent[0];
+				agent.position.add(collisionAdjustment);
+			}
+		}
+	}
+
+	updateTiming() {
+		this.now = Date.now();
+		let deltaTime = this.now - this.then;
+		if (deltaTime) { 
+			this.deltaTime = deltaTime;
+		}
+		this.then = this.now;
+	}
+
+	clear() {
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+	}
+};
+
+class V2 {
+	constructor(x = 0, y = undefined) {
+		if (x === 0 && y === undefined) {
+			this.x = 0; this.y = 0;
+		} else if (y === undefined && typeof x === "object") {
+			this.x = x.x; this.y = x.y;
+		} else {
+			this.x = x; this.y = y;
+		}
+		this.assert();
+	}
+	isZero() { return this.x === 0 && this.y === 0; }
+	assert() { if (this.x === undefined || this.y === undefined) { throw new Error("undefined values! " + this.toString()); } }
+	set(x,y) { this.x = x; this.y = y; this.assert(); return this; }
+	copy(v) { this.x = v.x; this.y = v.y; this.assert(); return this; }
+	add(v) { this.x += v.x; this.y += v.y; this.assert(); return this; }
+	sub(v) { this.x -= v.x; this.y -= v.y; this.assert(); return this; }
+	mul(v) {
+		       if (typeof v === "object") {
+			this.x *= v.x; this.y *= v.y;
+		} else if (typeof v === "number") {
+			this.x *= v; this.y *= v;
+		}
+		this.assert();
+		return this;
+	}
+	div(v) {
+		       if (typeof v === "object") {
+			this.x /= v.x; this.y /= v.y;
+		} else if (typeof v === "number") {
+			this.x /= v; this.y /= v;
+		}
+		this.assert();
+		return this;
+	}
+	magnitudeSq() { return this.x * this.x + this.y * this.y; }
+	magnitude() { return Math.sqrt(this.magnitudeSq()); }
+	normalized() { let mag = this.magnitude(); return new V2(this.x / mag, this.y / mag); }
+	static sum(a, b) { return new V2(a.x + b.x, a.y + b.y); }
+	static diff(a, b) { return new V2(a.x - b.x, a.y - b.y); }
+	static dot(a, b) { return a.x * b.x + a.y * b.y; }
+	static sign(a, b) { return a.x * b.y - a.y * b.x; }
+	static isNan(v) { return !v.x || !v.y; }
+	static prod(a, b) {
+		       if (typeof a === "object" && typeof b === "object") {
+			return new V2(a.x * b.x, a.y * b.y);
+		} else if (typeof a === "object" && typeof b === "number") {
+			return new V2(a.x * b, a.y * b);
+		} else if (typeof b === "object" && typeof a === "number") {
+			return new V2(b.x * a, b.y * a);
+		}
+		throw "can't multiply "+(typeof a)+" and "+(typeof b);
+	}
+	static quotient(a, b) {
+		       if (typeof a === "object" && typeof b === "object") {
+			return new V2(a.x / b.x, a.y / b.y);
+		} else if (typeof a === "object" && typeof b === "number") {
+			return new V2(a.x / b, a.y / b);
+		}
+		return this;
+	}
+	static lerp(a, b, p) {
+		let dx = b.x - a.x;
+		let dy = b.y - a.y;
+		return new V2(a.x + (dx * p), a.y + (dy * p));
+	}
+	static distance(a, b) {
+		let x = a.x-b.x;
+		let y = a.y-b.y;
+		return Math.sqrt(x*x+y*y);
+	}
+}
+
+V2.prototype.toString = function() {
+	return "("+this.x+","+this.y+")";
+};
+
+class AABB {
+	constructor(min, max) { this.min = min; this.max = max; }
+	static isInside(v, min, max) { return v.x < max.x && v.y < max.y && v.x >= min.x && v.y >= min.y; }
+	contains(v) {
+		return AABB.isInside(v, this.min, this.max);
+	}
+	getCenter() { return new V2((min.x+max.x)/2, (min.y+max.y)/2); }
+}
+
+class Wire {
+	constructor() { }
+	draw(ctx) {
+		this.drawAlgorithm(ctx);
+	}
+	drawLine(ctx) {
+		ctx.strokeStyle = this.color;
+		ctx.lineWidth = this.thickness;
+		ctx.beginPath();
+		ctx.moveTo(this.start.x, this.start.y);
+		ctx.lineTo(this.end.x, this.end.y);
+		ctx.stroke();
+	}
+	drawCircle(ctx) {
+		ctx.strokeStyle = this.color;
+		ctx.lineWidth = this.thickness;
+		ctx.beginPath();
+		ctx.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI);
+		ctx.stroke();
+	}
+	line(start, end, color = "black", thickness = 1) {
+		this.start = start; this.end = end; this.color = color; this.thickness = thickness;
+		this.drawAlgorithm = this.drawLine;
+	}
+	circle(center, radius, color = "black", thickness = 1) {
+		this.position = center; this.radius = radius; this.color = color; this.thickness = thickness;
+		this.drawAlgorithm = this.drawCircle;
+	}
+}
+
+class Wires {
+	constructor() {
+		this.wires = {};
+	}
+	make(name) {
+		let found = this.wires[name];
+		if (found) { return found; }
+		found = new Wire()
+		found.name = name;
+		this.wires[name] = found;
+		return found;
+	}
+	draw(ctx) {
+		for (const [key, value] of Object.entries(this.wires)) {
+			if (key.hidden) { continue; }
+			value.draw(ctx);
+		}
+	}
+}
+var WIRES = new Wires();
+var DOT_TEST = 0;
+
+class BasicBehavior {
+	static update (agent, deltaTime) {
+		if (agent.target) {
+			WIRES.make(agent.name + "target").circle(agent.target, 2);
+			let delta = V2.diff(agent.target, agent.position);
+			let distance = delta.magnitude();
+			if (distance < agent.radius) {
+				agent.velocity = new V2(0,0);
+			} else {
+				let direction = V2.quotient(delta, distance);
+				agent.velocity = V2.prod(direction, agent.speed);
+			}
+		}
+	}
+}
+
+class SeekBehavior {
+	constructor(onArrival) {
+		this.onArrival = onArrival;
+	}
+	execute(agent, deltaTime) {
+		let finished = update(agent, deltaTime);
+		if (this.onArrival && finished) {
+			this.onArrival();
+		}
+	}
+	static update (agent, deltaTime) {
+		if (!agent.target) { return false; }
+		//console.log(agent.target, agent.position);
+		WIRES.make(agent.name + "target").circle(agent.target, 2);
+		if (DRAWMATH) {
+			WIRES.make(agent.name + "currentVelocity").line(agent.position, V2.sum(agent.position, agent.velocity), 'black');
+		}
+		let targetDelta = V2.diff(agent.target, agent.position);
+		if (targetDelta.isZero() && agent.velocity.isZero()) {
+			return true;
+		}
+		let targetDistance = targetDelta.magnitude();
+		let targetDirection = V2.quotient(targetDelta, targetDistance);
+		let currentSpeed = agent.velocity.magnitude();
+		let velocityDirection = V2.quotient(agent.velocity, currentSpeed);
+		let useStopLogic = agent.targetEndingSpeed !== undefined;
+		let currentExpectedMovement = new V2(agent.velocity);
+		let desiredVelocity = V2.prod(targetDirection, agent.speed);
+		let whereAmIGoing = desiredVelocity;
+		let desiredSteeringForce= V2.diff(desiredVelocity, currentExpectedMovement);
+
+		if (useStopLogic) {
+			let amountOfSpeedToStop = currentSpeed;
+			if (agent.targetEndingSpeed) {
+				amountOfSpeedToStop - agent.targetEndingSpeed;
+			}
+			let brakeDistance = amountOfSpeedToStop * amountOfSpeedToStop / (2 * agent.acceleration);
+			let stoppingVector = V2.prod(velocityDirection, brakeDistance);
+			if (DRAWMATH) {
+				let brakePosition = V2.sum(agent.position, stoppingVector);
+				WIRES.make(agent.name + "brakedistance").line(agent.position, brakePosition, 'red');
+			}
+			currentExpectedMovement.copy(stoppingVector);
+			let stopping = false;
+			let desiredFinalVelocity = new V2(0,0);
+			if (agent.targetEndingSpeed) {
+				desiredFinalVelocity = V2.prod(targetDirection, agent.targetEndingSpeed);
+			}
+			if (brakeDistance > targetDistance) {
+				let alignmentWithBrakes = V2.dot(targetDirection, velocityDirection);
+				if (alignmentWithBrakes > 0) {
+					desiredVelocity = desiredFinalVelocity;
+					stopping = true;
+				}
+			}
+			let needsToBrake = brakeDistance > 0 && brakeDistance >= targetDistance;
+			if (needsToBrake) {
+				desiredSteeringForce.copy(V2.diff(desiredFinalVelocity, currentExpectedMovement));
+				whereAmIGoing = desiredFinalVelocity;
+			}
+			if (DRAWMATH) {
+				let brakeColor = needsToBrake ? 'red' : 'green';
+				let brakePosition = V2.sum(agent.position, stoppingVector);
+				WIRES.make(agent.name + "brakeposition").circle(brakePosition, agent.radius, brakeColor);
+			}
+			if (!stopping) {
+				whereAmIGoing = V2.prod(targetDirection, brakeDistance);
+				let hardSteeringForce = V2.diff(whereAmIGoing, currentExpectedMovement);
+				const dotIsCloseEnough = 15/16;
+				let steeringIsInTheRightDirection = V2.dot(hardSteeringForce, desiredVelocity) > 1;
+				if (steeringIsInTheRightDirection) {
+					desiredSteeringForce.copy(hardSteeringForce);
+				} else {
+					desiredSteeringForce.copy(desiredVelocity);
+				}
+				agent.lastSteeringForce = desiredSteeringForce;
+			}
+			return false;
+		}
+		
+		let steeringDirection = desiredSteeringForce.normalized();
+		if (DRAWMATH) {
+			let actualSteeringForce = V2.prod(steeringDirection, agent.acceleration);
+			let velocityEndPoint = V2.sum(agent.position, desiredVelocity);
+			let whereAmIGoingEndPoint = V2.sum(agent.position, whereAmIGoing);
+			WIRES.make(agent.name + "desiredVelocity").line(agent.position, velocityEndPoint, 'blue');
+			WIRES.make(agent.name + "currentVelocity").line(whereAmIGoingEndPoint, V2.diff(whereAmIGoingEndPoint, currentExpectedMovement), 'gray');
+			WIRES.make(agent.name + "steeringforce").line(agent.position, V2.sum(agent.position, actualSteeringForce), 'magenta');
+		}
+		let actualForceThisFrame = agent.acceleration * deltaTime;
+		let accelerationThisFrame = V2.prod(steeringDirection, actualForceThisFrame);
+		if (agent.velocity) {
+			agent.velocity.add(accelerationThisFrame);
+		} else {
+			agent.velocity = accelerationThisFrame;
+		}
+
+		if (targetDistance < actualForceThisFrame && currentSpeed < actualForceThisFrame/4) {
+			agent.velocity.set(0, 0);
+			agent.position = agent.target;
+		} else {
+			agent.enforceSpeedLimit();
+		}
+		return;
+	}
+}
+
+class RandomWalkBehavior {
+	constructor(radiusMin, radiusMax = undefined, timeout = 5) {
+		this.radMin = radiusMin;
+		this.madMax = radiusMax;
+		this.timeout = timeout;
+		this.timer = 0;
+	}
+	pickNextTarget(agent) {
+		let angleRadian = Math.random() * Math.PI * 2;
+		let direction = new V2(Math.cos(angleRadian), Math.sin(angleRadian));
+		let radius = this.radMin;
+		if (this.radMax !== undefined) {
+			let radDelta = this.radMax - this.radMin;
+			radius = this.radMin + Math.random() * radDelta;
+		}
+		let targetDelta = V2.prod(direction, radius);
+		agent.target = V2.sum(agent.position, targetDelta);
+		//agent.targetEndingSpeed = 0; // TODO why do they not move when this is uncommented?
+	}
+	
+	update(agent, deltaTime) {
+		this.timer += deltaTime;
+		if (this.timer >= this.timeout || SeekBehavior.update(agent, deltaTime)) {
+			pickNextTarget(agent);
+			this.timer = 0;
+		}
+	}
+}
+
+class StayInAreaBehavior {
+	constructor(min, max, normalUpdate, oobAction) {
+		this.area = new AABB(min, max);
+		this.updateBehavior = normalUpdate; this.oobAction = oobAction;
+	}
+	update(agent, deltaTime) {
+		if (!agent.target || !this.area.contains(agent.target)) {
+			this.oobAction();
+		} else {
+			this.updateBehavior(agent, deltaTime);
+		}
+	}
+}
+
+class Agent {
+	constructor(name, position, radius, speed, acceleration, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
+		this.name = name;
+		this.position = position;
+		this.velocity = new V2(0,0);
+		this.radius = radius;
+		this.speed = speed;
+		this.mass = mass;
+		this.acceleration = acceleration;
+		this.strokeColor = strokeColor;
+		this.fillColor = fillColor;
+		this.borderThickness = borderThickness;
+		//this.updateBehavior = SeekBehavior.update;
+		this.randomWalkBehavior = new RandomWalkBehavior(20, 200, 5);
+		this.stayInBounds = new StayInAreaBehavior(new V2(), new V2(800,600), this.randomWalkBehavior.update, () => {
+			this.randomWalkBehavior.pickNextTarget(this);
+		});
+		this.updateBehavior = this._updateBehaviorTree;
+	}
+	_updateBehaviorTree(agent, deltaTime) {
+		this.stayInBounds.update(agent, deltaTime);
+	}
+
+	draw(ctx) {
+		ctx.beginPath();
+		if (this.strokeColor) {
+			ctx.strokeStyle = this.strokeColor;
+		}
+		ctx.lineWidth = this.borderThickness;
+		ctx.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI);
+		if (this.fillColor) {
+			ctx.fillStyle = this.fillColor;
+			ctx.fill();
+		}
+		//ctx.moveTo(this.position.x, this.position.y);
+		//let endPoint = V2.sum(this.position, this.velocity);
+		//ctx.lineTo(endPoint.x, endPoint.y);
+		ctx.stroke();
+		if (this.stopDistance) {
+			let moveDir = this.velocity.normalized();
+			let stopVector = V2.prod(moveDir, this.stopDistance);
+			let stopPosition = V2.sum(this.position, stopVector);
+			ctx.beginPath();
+			ctx.fillStyle = undefined;
+			ctx.arc(stopPosition.x, stopPosition.y, this.radius, 0, 2 * Math.PI);
+			ctx.stroke();
+		}
+	}
+
+	update(deltaTime) {
+		if (this.updateBehavior) {
+			this.updateBehavior(this, deltaTime);
+		} else {
+			BasicBehavior.update(this, deltaTime);
+		}
+	}
+
+	updateApplyPhysics(deltaTime) {
+		if (this.velocity) {
+			let movedThisFrame = V2.prod(this.velocity, deltaTime);
+			this.position.add(movedThisFrame);
+		}
+	}
+
+	setTarget(x, y) {
+		this.target = new V2(x, y);
+		this.targetEndingSpeed = 0;
+		//console.log(this.fillColor, this.target, this.position);
+	}
+
+	setEndOfLine(x, y) {
+		this.setTarget(x, y);
+	}
+
+	enforceSpeedLimit() {
+		let currentSpeed = this.velocity.magnitude();
+		if (currentSpeed > this.speed) {
+			let velocityDirection = V2.quotient(this.velocity, currentSpeed);
+			this.velocity = V2.prod(velocityDirection, this.speed);
+		}
+	}
+
+	static collision(agent0, agent1) {
+		let sumRadius = agent0.radius + agent1.radius;
+		let delta = V2.diff(agent1.position, agent0.position);
+		let distance = delta.magnitude();
+		if (sumRadius > distance) {
+			let overlap = sumRadius - distance;
+			let direction = V2.quotient(delta, distance);
+			let totalMass = agent0.mass + agent1.mass;
+			let offset0 = -overlap*agent1.mass/totalMass;
+			let offset1 = overlap*agent0.mass/totalMass;
+			let resolution0 = V2.prod(direction, offset0);
+			let resolution1 = V2.prod(direction, offset1);
+			let collisionData = {
+				agent: [ agent0, agent1 ],
+				position: [ agent0.position, agent1.position ],
+				resolution: [ resolution0, resolution1 ]
+			};
+			return collisionData;
+		}
+		return null;
+	}
+};
+
+APP = new App();
+agents = [
+	new Agent("Bluey", new V2(0,0), 20, 50, 100, 5, 'cyan', 'blue', 0.25),
+	new Agent("Red", new V2(100,100), 10, 200, 20, 10, 'orange', 'red', 0.25),
+	new Agent("gray", new V2(40,300), 8, 100, 50),
+];
+
+function mouseMoveInterrupt(e) {
+	APP.updateMousePosition(e || window.event);
+}
+
+function keyDownInterrupt(e) {
+	APP.updateKeyInput(e || window.event);
+	if (!e) { e = window.event; }
+	if (e.keyCode === 187) { // =
+		testP += 1/8;
+	}
+	if (e.keyCode === 189) { // -
+		testP -= 1/8;
+	}
+	if (e.keyCode === 32) { 
+		DRAWMATH = !DRAWMATH;
+	}
+}
+
+function getTextRectSize(ctx, text) {
+	let metrics = ctx.measureText(text);
+	let fontHeight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
+	let actualHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+	let actualWidth = ctx.measureText(text).width;
+	return new V2(actualWidth, actualHeight);
+}
+
+function speechBubble(ctx, text, position, speechSource, bubbleLine = '#888', bubbleColor = '#fffa', textColor = '#222') {
+	ctx.font = "12px Arial";
+	ctx.textAlign = "center";
+	let metrics = ctx.measureText(text);
+	let line = text.split("\n");
+	let totalRect = new V2(0,0);
+	let lineRects = [];
+	let lineSpacing = 5;
+	for(let i = 0; i < line.length; i++) {
+		if (i > 0) {
+			totalRect.y += lineSpacing;
+		}
+		let lineSize = getTextRectSize(ctx, line[i]);
+		lineRects.push(lineSize);
+		if (totalRect.x < lineSize.x) {
+			totalRect.x = lineSize.x;
+		}
+		totalRect.y += lineSize.y;
+	}
+	let p = new V2(position);
+	let extraSize = V2.prod(totalRect, 0.125);
+	totalRect.add(extraSize);
+	ctx.strokeStyle = bubbleLine;
+	ctx.fillStyle = bubbleColor;
+	drawOvalWordBubble(ctx, p, totalRect, speechSource);
+	p.y += extraSize.y/2;
+	let cursor = V2.diff(p, new V2(0, totalRect.y/2));
+	const descentOffset = metrics.fontBoundingBoxDescent/2;
+	for (let i = 0; i < line.length; ++i) {
+		let lineSize = lineRects[i];//getTextRectSize(ctx, line[i]);
+		// ctx.strokeStyle = '#fff4';
+		// ctx.fillStyle = "#fff";
+		// ctx.beginPath();
+		// ctx.rect(cursor.x - lineSize.x/2, cursor.y + descentOffset, lineSize.x, lineSize.y);
+		// ctx.fill();
+		// ctx.stroke();
+		ctx.fillStyle = textColor;
+		ctx.fillText(line[i], cursor.x, cursor.y + lineSize.y);
+		cursor.y += lineSize.y + lineSpacing;
+	}
+}
+
+var circle32 = [];
+for (let i = 0; i < Math.PI * 2; i += Math.PI/16) {
+	circle32.push(new V2(Math.cos(i)/2, Math.sin(i)/2));
+}
+
+function drawOvalWordBubble(ctx, center, size, source, precomputedVerts) {
+	if (!precomputedVerts) {
+		precomputedVerts = calculateOvalWordBubble(center, size, source);
+	}
+	ctx.beginPath();
+	let vert = precomputedVerts[0];
+	ctx.moveTo(vert.x, vert.y)
+	for (let i = 1; i < precomputedVerts.length; i++) {
+		vert = precomputedVerts[i];
+		ctx.lineTo(vert.x, vert.y);
+	}
+	ctx.fill();
+	ctx.stroke();
+}
+
+function calculateOvalWordBubble(center, size, source) {
+	let points = [];
+	let last = circle32.length-1;
+	let x = circle32[last].x * size.x;
+	let y = circle32[last].y * size.y;
+	points.push(new V2(x,y));
+	let lastPoint = new V2(x,y);
+	let thisPoint = new V2(x,y);
+	let toSource = V2.diff(source, center);
+	let lastSign = V2.sign(toSource, thisPoint) > 0;
+	for(let i = 0; i < 32; ++i) {
+		x = circle32[i].x * size.x;
+		y = circle32[i].y * size.y;
+		thisPoint.set(x,y);
+		let thisSign = V2.sign(toSource, thisPoint) > 0;
+		if (lastSign != thisSign && V2.dot(thisPoint, toSource) > 0) {
+			points.push(source);
+		}
+		lastSign = thisSign;
+		points.push(new V2(x + center.x, y + center.y));
+		lastPoint.set(x, y);
+	}
+	return points;
+}
+
+function mouseDownInterrupt(e) {
+	APP.updateMouseDownInput(e || window.event);
+}
+		</script>
+		<br>
+		could we implement <a href="https://www.red3d.com/cwr/steer/gdc99/">steering</a>
+		<a href="https://devforum.roblox.com/t/introduction-to-steering-behaviors/1441680/6">behavior</a>
+		for our agent?
+	</body>
+</html>
