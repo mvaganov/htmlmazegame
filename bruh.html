@@ -639,9 +639,9 @@ class Agent {
 
 APP = new App();
 agents = [
-	new Agent("Bluey", new V2(0,0), 20, 50, 100, 3, 5, 'cyan', 'blue', 0.25),
-	new Agent("Red", new V2(100,100), 10, 200, 20, 1, 10, 'orange', 'red', 0.25),
-	new Agent("gray", new V2(40,300), 8, 100, 50),
+	// new Agent("Bluey", new V2(0,0), 20, 50, 100, 3, 5, 'cyan', 'blue', 0.25),
+	// new Agent("Red", new V2(100,100), 10, 200, 20, 1, 10, 'orange', 'red', 0.25),
+	// new Agent("gray", new V2(40,300), 8, 100, 50),
 ];
 
 const SILLY_NAMES = ["bitty","bore","bug","bum", "dinq", "fuzz", "goo", "gum", "hick", "pea", "shoo", "slug", "sniff", "stink", "trash", "worm", "zoo", "fig", "chew", "beanie", "mad", "egg", "wee", "lick", "fart", "buzz", "fluff", "poop", "barf", "rat", "bobo", "booger", "fudge", "doozy", "hippy", "jiggy", "dink", "oink", "roach", "snot", "sock", "toot", "pie", "wiggle", "spotty", "hobo", "woof", "noodle", "droopy", "pants", "moo", "buns", "kins", "face", "ball", "rider", "worth", "ton"];
@@ -664,7 +664,7 @@ function generateUniqueSillyName(){
 	return sillyName;
 }
 
-for(let i = 0; i < 20; ++i) {
+for(let i = 0; i < 30; ++i) {
 	let sillyName = generateUniqueSillyName();
 	let position = new V2(Math.random()*800, Math.random()*600);
 	let radius = 5 + 15 * Math.random();
