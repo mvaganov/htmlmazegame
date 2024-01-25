@@ -167,7 +167,7 @@ class App {
 		if (DRAWMATH) {
 			WIRES.draw(this.ctx);
 		}
-		speechBubble(this.ctx, "this is\na test of text rendering\nwoah\nlol", agents[0].position, agents[1].position, agents[1].strokeColor);
+		//speechBubble(this.ctx, "this is\na test of text rendering\nwoah\nlol", agents[0].position, agents[1].position, agents[1].strokeColor);
 	}
 
 	update() {
@@ -177,31 +177,35 @@ class App {
 			let deltatime = this.deltaTime / 1000;
 			forEachAgent(a => a.update(deltatime));
 			forEachAgent(a => a.updateApplyPhysics(deltatime));
-			let collisionsPerAgent = {};
-			forEachAgent(a => {
-				let collisions = collisionHappening(a);
-				if (collisions != null) {
-					let collisionsHappeningToAgent = collisionsPerAgent[a.name];
-					if (!collisionsHappeningToAgent) {
-						collisionsHappeningToAgent = [];
-					}
-					for (let i = 0; i < collisions.length; i++) {
-						collisionsHappeningToAgent.push(collisions[i]);
-					}
-					collisionsPerAgent[a.name] = collisionsHappeningToAgent;
+			this.enforceCollisionDetection();
+		}
+	}
+
+	enforceCollisionDetection() {
+		let collisionsPerAgent = {};
+		forEachAgent(a => {
+			let collisions = collisionHappening(a);
+			if (collisions != null) {
+				let collisionsHappeningToAgent = collisionsPerAgent[a.name];
+				if (!collisionsHappeningToAgent) {
+					collisionsHappeningToAgent = [];
 				}
-			});
-			for (let agentname in collisionsPerAgent) {
-				let collisions = collisionsPerAgent[agentname];
-				let collisionAdjustment = new V2(0,0);
-				for(let i = 0; i < collisions.length; i++) {
-					let collision = collisions[i];
-					collisionAdjustment.add(collision.resolution[0]);
+				for (let i = 0; i < collisions.length; i++) {
+					collisionsHappeningToAgent.push(collisions[i]);
 				}
-				collisionAdjustment.div(collisions.length);
-				let agent = collisions[0].agent[0];
-				agent.position.add(collisionAdjustment);
+				collisionsPerAgent[a.name] = collisionsHappeningToAgent;
 			}
+		});
+		for (let agentname in collisionsPerAgent) {
+			let collisions = collisionsPerAgent[agentname];
+			let collisionAdjustment = new V2(0,0);
+			for(let i = 0; i < collisions.length; i++) {
+				let collision = collisions[i];
+				collisionAdjustment.add(collision.resolution[0]);
+			}
+			collisionAdjustment.div(collisions.length);
+			let agent = collisions[0].agent[0];
+			agent.position.add(collisionAdjustment);
 		}
 	}
 
@@ -377,12 +381,12 @@ class SeekBehavior {
 	constructor(onArrival) {
 		this.onArrival = onArrival;
 	}
-	execute(agent, deltaTime) {
-		let finished = update(agent, deltaTime);
-		if (this.onArrival && finished) {
-			this.onArrival();
-		}
-	}
+	//execute(agent, deltaTime) {
+	//	let finished = update(agent, deltaTime);
+	//	if (this.onArrival && finished) {
+	//		this.onArrival();
+	//	}
+	//}
 	static update (agent, deltaTime) {
 		if (!agent.target) { return false; }
 		//console.log(agent.target, agent.position);
@@ -391,13 +395,16 @@ class SeekBehavior {
 			WIRES.make(agent.name + "currentVelocity").line(agent.position, V2.sum(agent.position, agent.velocity), 'black');
 		}
 		let targetDelta = V2.diff(agent.target, agent.position);
-		if (targetDelta.isZero() && agent.velocity.isZero()) {
+		let targetDistance = targetDelta.magnitude();
+		let currentSpeed = agent.velocity.magnitude();
+		let moveThisFrame = currentSpeed * deltaTime;
+		let actualForceThisFrame = agent.acceleration * deltaTime;
+		if (targetDistance < moveThisFrame) {//} && (currentSpeed - actualForceThisFrame) <= agent.targetEndingSpeed) {
 			return true;
 		}
-		let targetDistance = targetDelta.magnitude();
 		let targetDirection = V2.quotient(targetDelta, targetDistance);
-		let currentSpeed = agent.velocity.magnitude();
 		let velocityDirection = V2.quotient(agent.velocity, currentSpeed);
+
 		let useStopLogic = agent.targetEndingSpeed !== undefined;
 		let currentExpectedMovement = new V2(agent.velocity);
 		let desiredVelocity = V2.prod(targetDirection, agent.speed);
@@ -450,7 +457,6 @@ class SeekBehavior {
 				}
 				agent.lastSteeringForce = desiredSteeringForce;
 			}
-			return false;
 		}
 		
 		let steeringDirection = desiredSteeringForce.normalized();
@@ -462,7 +468,6 @@ class SeekBehavior {
 			WIRES.make(agent.name + "currentVelocity").line(whereAmIGoingEndPoint, V2.diff(whereAmIGoingEndPoint, currentExpectedMovement), 'gray');
 			WIRES.make(agent.name + "steeringforce").line(agent.position, V2.sum(agent.position, actualSteeringForce), 'magenta');
 		}
-		let actualForceThisFrame = agent.acceleration * deltaTime;
 		let accelerationThisFrame = V2.prod(steeringDirection, actualForceThisFrame);
 		if (agent.velocity) {
 			agent.velocity.add(accelerationThisFrame);
@@ -476,17 +481,18 @@ class SeekBehavior {
 		} else {
 			agent.enforceSpeedLimit();
 		}
-		return;
+		return false;
 	}
 }
 
 class RandomWalkBehavior {
 	constructor(radiusMin, radiusMax = undefined, timeout = 5) {
 		this.radMin = radiusMin;
-		this.madMax = radiusMax;
+		this.radMax = radiusMax;
 		this.timeout = timeout;
 		this.timer = 0;
 	}
+
 	pickNextTarget(agent) {
 		let angleRadian = Math.random() * Math.PI * 2;
 		let direction = new V2(Math.cos(angleRadian), Math.sin(angleRadian));
@@ -497,13 +503,14 @@ class RandomWalkBehavior {
 		}
 		let targetDelta = V2.prod(direction, radius);
 		agent.target = V2.sum(agent.position, targetDelta);
-		//agent.targetEndingSpeed = 0; // TODO why do they not move when this is uncommented?
+		agent.targetEndingSpeed = 10;
 	}
-	
+
 	update(agent, deltaTime) {
 		this.timer += deltaTime;
+		//agent.targetEndingSpeed = 1; // TODO why do they not move when this is uncommented?
 		if (this.timer >= this.timeout || SeekBehavior.update(agent, deltaTime)) {
-			pickNextTarget(agent);
+			this.pickNextTarget(agent);
 			this.timer = 0;
 		}
 	}
@@ -524,7 +531,7 @@ class StayInAreaBehavior {
 }
 
 class Agent {
-	constructor(name, position, radius, speed, acceleration, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
+	constructor(name, position, radius, speed, acceleration, internalClock = 3, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
 		this.name = name;
 		this.position = position;
 		this.velocity = new V2(0,0);
@@ -535,9 +542,11 @@ class Agent {
 		this.strokeColor = strokeColor;
 		this.fillColor = fillColor;
 		this.borderThickness = borderThickness;
-		//this.updateBehavior = SeekBehavior.update;
-		this.randomWalkBehavior = new RandomWalkBehavior(20, 200, 5);
-		this.stayInBounds = new StayInAreaBehavior(new V2(), new V2(800,600), this.randomWalkBehavior.update, () => {
+		// \\this.updateBehavior = (agent,deltaTime) => SeekBehavior.update(agent,deltaTime);
+		this.randomWalkBehavior = new RandomWalkBehavior(this.radius, this.radius*3, internalClock);
+		this.stayInBounds = new StayInAreaBehavior(new V2(), new V2(800,600),
+		(agent, deltaTime) => this.randomWalkBehavior.update(agent, deltaTime),
+		() => {
 			this.randomWalkBehavior.pickNextTarget(this);
 		});
 		this.updateBehavior = this._updateBehaviorTree;
@@ -630,10 +639,45 @@ class Agent {
 
 APP = new App();
 agents = [
-	new Agent("Bluey", new V2(0,0), 20, 50, 100, 5, 'cyan', 'blue', 0.25),
-	new Agent("Red", new V2(100,100), 10, 200, 20, 10, 'orange', 'red', 0.25),
+	new Agent("Bluey", new V2(0,0), 20, 50, 100, 3, 5, 'cyan', 'blue', 0.25),
+	new Agent("Red", new V2(100,100), 10, 200, 20, 1, 10, 'orange', 'red', 0.25),
 	new Agent("gray", new V2(40,300), 8, 100, 50),
 ];
+
+const SILLY_NAMES = ["bitty","bore","bug","bum", "dinq", "fuzz", "goo", "gum", "hick", "pea", "shoo", "slug", "sniff", "stink", "trash", "worm", "zoo", "fig", "chew", "beanie", "mad", "egg", "wee", "lick", "fart", "buzz", "fluff", "poop", "barf", "rat", "bobo", "booger", "fudge", "doozy", "hippy", "jiggy", "dink", "oink", "roach", "snot", "sock", "toot", "pie", "wiggle", "spotty", "hobo", "woof", "noodle", "droopy", "pants", "moo", "buns", "kins", "face", "ball", "rider", "worth", "ton"];
+function getRandomInt(max) { return Math.floor(Math.random() * max); }
+function randomNameBit() {
+	return SILLY_NAMES[getRandomInt(SILLY_NAMES.length)];
+}
+function generateSillyName() {
+	return randomNameBit()+" "+randomNameBit()+randomNameBit();
+}
+var agentDictionary = {};
+function generateUniqueSillyName(){
+	let sillyName = generateSillyName();
+	let guard = 0;
+	do {
+		if (++guard > 100) { throw "too many silly names? "+Object.keys(agentDictionary).length;}
+		sillyName = generateSillyName();
+	} while (agentDictionary[sillyName] !== undefined);
+	agentDictionary[sillyName] = 1;
+	return sillyName;
+}
+
+for(let i = 0; i < 20; ++i) {
+	let sillyName = generateUniqueSillyName();
+	let position = new V2(Math.random()*800, Math.random()*600);
+	let radius = 5 + 15 * Math.random();
+	let speed = 5 + 95 * Math.random();
+	let acceleration = 5 + 95 * Math.random();
+	let mass = 1 + 100 * Math.random();
+	let fillColor = "#" + Math.floor(Math.random()*16777215).toString(16);
+	let strokeColor = "#" + Math.floor(Math.random()*16777215).toString(16);
+	let internalClock = 2 + 8 * Math.random();
+	let agent = new Agent(sillyName, position, radius, speed, acceleration, internalClock, mass, fillColor, strokeColor);
+	console.log(sillyName);
+	agents.push(agent);
+}
 
 function mouseMoveInterrupt(e) {
 	APP.updateMousePosition(e || window.event);
@@ -648,7 +692,7 @@ function keyDownInterrupt(e) {
 	if (e.keyCode === 189) { // -
 		testP -= 1/8;
 	}
-	if (e.keyCode === 32) { 
+	if (e.keyCode === 27) { 
 		DRAWMATH = !DRAWMATH;
 	}
 }
