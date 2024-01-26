@@ -66,7 +66,8 @@
 // Satire and Irony: Satirical humor involves mocking or ridiculing people, institutions, or societal norms. Irony, where there is a contrast between expectations and reality, can also be comedic.
 // Self-Deprecation: Jokes that involve poking fun at oneself or one's own flaws can be relatable and endearing. It creates a sense of humility that resonates with audiences.
 // Cultural and Social Context: Understanding cultural references and social context is crucial for some jokes. Humor that taps into shared cultural knowledge can be more effective within specific groups.
-
+const WORLD_WIDTH = 800;
+const WORLD_HEIGHT = 600;
 let DRAWMATH = false;
 var APP;
 var agents;
@@ -75,15 +76,14 @@ var drawList = [];
 
 var collisionHappening = function (agent) {
 	let listOfCollisions = null;
-	for (var i = 0; i < agents.length; i++) {
-		let a = agents[i];
-		if (a == agent) {
-			continue;
-		}
-		if (!a) {
-			console.log("null agent? " + i);
-			continue;
-		}
+	let agentCircle = Agent.getCircle(agent);
+	let collidingAgents = spacePartition.getCollisions(agentCircle, Agent.getCircle);
+	if (!collidingAgents || collidingAgents.length == 0) {
+		return null;
+	}
+	for (let i = 0; i < collidingAgents.length; i++) {
+		let a = collidingAgents[i];
+		if (a == agent) { continue; }
 		let collisionData = Agent.collision(agent, a);
 		if (collisionData != null) {
 			if (listOfCollisions == null) {
@@ -93,6 +93,7 @@ var collisionHappening = function (agent) {
 			}
 		}
 	}
+
 	return listOfCollisions;
 }
 
@@ -108,120 +109,6 @@ function mainLoop() {
 	APP.drawGame();
 	setTimeout(mainLoop, APP.frameDelay);
 }
-
-class App {
-	constructor() {
-		this.canvas = document.createElement("canvas");
-		this.now = Date.now();
-		console.log("creating " + this.now);
-		this.then = Date.now();
-		this.targetFps = 30;
-		this.frameDelay = 1000 / this.targetFps;
-		this.mouse = {x: 0, y: 0};
-		this.canvas.width = 800;
-		this.canvas.height = 600;
-		this.context = this.canvas.getContext("2d");
-		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-		document.onkeydown = this.userkey;
-	}
-
-	updateKeyInput(e) {
-		const ESCAPE = 27;
-		if (e.keyCode === ESCAPE) {
-			this.clearScreen = true;
-		} else {
-			console.log("key: " + e.keyCode)
-		}
-	};
-
-	updateMousePosition(e) {
-		if (!e) {
-			return;
-		}
-		this.mouse.x = e.clientX;
-		this.mouse.y = e.clientY;
-	}
-
-	updateMouseDownInput(e) {
-		this.updateMousePosition(e);
-		forEachAgent(a => a.setEndOfLine(this.mouse.x, this.mouse.y));
-	}
-
-	processInput() {
-		if (this.mouse) {
-		}
-		if (this.clearScreen) {
-			this.clear();
-			this.clearScreen = false;
-		}
-	}
-
-	drawGame() {
-		this.clear();
-		this.ctx = this.canvas.getContext("2d");
-		// this.ctx.font = "30px Arial";
-		// this.ctx.fillStyle = "#0f0";
-		// this.ctx.textAlign = "center";
-		// this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
-		forEachAgent(a => a.draw(this.ctx));
-		if (DRAWMATH) {
-			WIRES.draw(this.ctx);
-		}
-		//speechBubble(this.ctx, "this is\na test of text rendering\nwoah\nlol", agents[0].position, agents[1].position, agents[1].strokeColor);
-	}
-
-	update() {
-		this.updateTiming();
-		let timeHasPassed = this.deltaTime > 0;
-		if (timeHasPassed) { 
-			let deltatime = this.deltaTime / 1000;
-			forEachAgent(a => a.update(deltatime));
-			forEachAgent(a => a.updateApplyPhysics(deltatime));
-			this.enforceCollisionDetection();
-		}
-	}
-
-	enforceCollisionDetection() {
-		let collisionsPerAgent = {};
-		forEachAgent(a => {
-			let collisions = collisionHappening(a);
-			if (collisions != null) {
-				let collisionsHappeningToAgent = collisionsPerAgent[a.name];
-				if (!collisionsHappeningToAgent) {
-					collisionsHappeningToAgent = [];
-				}
-				for (let i = 0; i < collisions.length; i++) {
-					collisionsHappeningToAgent.push(collisions[i]);
-				}
-				collisionsPerAgent[a.name] = collisionsHappeningToAgent;
-			}
-		});
-		for (let agentname in collisionsPerAgent) {
-			let collisions = collisionsPerAgent[agentname];
-			let collisionAdjustment = new V2(0,0);
-			for(let i = 0; i < collisions.length; i++) {
-				let collision = collisions[i];
-				collisionAdjustment.add(collision.resolution[0]);
-			}
-			collisionAdjustment.div(collisions.length);
-			let agent = collisions[0].agent[0];
-			agent.position.add(collisionAdjustment);
-		}
-	}
-
-	updateTiming() {
-		this.now = Date.now();
-		let deltaTime = this.now - this.then;
-		if (deltaTime) { 
-			this.deltaTime = deltaTime;
-		}
-		this.then = this.now;
-	}
-
-	clear() {
-		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-	}
-};
 
 class V2 {
 	constructor(x = 0, y = undefined) {
@@ -261,6 +148,7 @@ class V2 {
 	magnitudeSq() { return this.x * this.x + this.y * this.y; }
 	magnitude() { return Math.sqrt(this.magnitudeSq()); }
 	normalized() { let mag = this.magnitude(); return new V2(this.x / mag, this.y / mag); }
+	area() { return this.x*this.y; }
 	static sum(a, b) { return new V2(a.x + b.x, a.y + b.y); }
 	static diff(a, b) { return new V2(a.x - b.x, a.y - b.y); }
 	static dot(a, b) { return a.x * b.x + a.y * b.y; }
@@ -303,11 +191,343 @@ V2.prototype.toString = function() {
 class AABB {
 	constructor(min, max) { this.min = min; this.max = max; }
 	static isInside(v, min, max) { return v.x < max.x && v.y < max.y && v.x >= min.x && v.y >= min.y; }
-	contains(v) {
-		return AABB.isInside(v, this.min, this.max);
+	size() { return new V2(this.max.x-this.min.x, this.max.y-this.min.y); }
+	area() { return this.size().area(); }
+	contains(v) { return AABB.isInside(v, this.min, this.max); }
+	getCenter() { return new V2((this.min.x+this.max.x)/2, (this.min.y+this.max.y)/2); }
+	intersectsCircle(center, radius) {
+		if (this.contains(center)) { return true; }
+		let radSize = new V2(radius,radius);
+		let expandedMin = V2.diff(this.min, radSize);
+		let expandedMax = V2.sum(this.max, radSize);
+		if (AABB.isInside(center, expandedMin, expandedMax)) {
+			let cornerCase = undefined;
+			if (center.x < this.min.x) {
+				if (center.y < this.min.y) {
+					cornerCase = this.min;
+				} else if (center.y > this.max.y) {
+					cornerCase = new V2(this.min.x, this.max.y);
+				}
+			} else if (center.x > this.max.x) {
+				if (center.y < this.min.y) {
+					cornerCase = new V2(this.max.x, this.min.y);
+				} else if (center.y > this.max.y) {
+					cornerCase = this.max;
+				}
+			}
+			if (cornerCase) {
+				let distance = V2.distance(cornerCase, center);
+				return distance <= radius;
+			}
+			return true;
+		}
+		return false;
 	}
-	getCenter() { return new V2((min.x+max.x)/2, (min.y+max.y)/2); }
+	intersectsRect(otherMin, otherMax) {
+		if (this.min.x > otherMax.x || otherMin.x > this.max.x || this.max.y > otherMin.y || otherMax.y > this.min.y) {
+			return false;
+		}
+		if (this.min.x == this.max.x || this.min.y == this.max.y || otherMax.x == otherMin.x || otherMin.y == otherMax.y) {
+			return false;
+		}
+		return true;
+	}
+	draw(ctx) {
+		let size = this.size();
+		ctx.beginPath();
+		ctx.rect(this.min.x, this.min.y, size.x, size.y);
+		ctx.stroke();
+	}
 }
+
+AABB.prototype.toString = function() {
+	return "(" + this.min.x + "," + this.min.y + ":" + this.max.x + "," + this.max.y + ")";
+};
+
+class Circle {
+	constructor(center, radius) {
+		this.center = center;
+		this.radius = radius;
+	}
+}
+
+Circle.prototype.toString = function() {
+	return "(" + this.center.x.toFixed(2) + "," + this.center.y.toFixed(2) + ":" + this.radius.toFixed(2) + ")";
+};
+
+class SpacePartition {
+	constructor(min, max, minArea, columnsRows, parent = undefined) {
+		this.aabb = new AABB(new V2(min), new V2(max));
+		this.list = [];
+		this.columnsRows = columnsRows;
+		this.depth = 0;
+		this.parent = parent;
+		while(parent) {
+			++this.depth;
+			parent = parent.parent;
+		}
+		if (this.depth > 3) {
+			return;
+		}
+		this.createSubPartition(minArea);
+	}
+
+	createSubPartition(minArea) {
+		let columns = this.columnsRows.x;
+		let rows = this.columnsRows.y;
+		let size = this.aabb.size();
+		let cellSize = new V2(size.x / columns, size.y / rows)
+		let cellArea = cellSize.area();
+		if (cellArea < minArea) {
+			return;
+		}
+		this.subpartition = [];
+		let cursor = new V2(this.aabb.min);
+		for(let r = 0; r < rows; ++r) {
+			cursor.x = this.aabb.min.x;
+			for(let c = 0; c < columns; ++c) {
+				let nextCell = new SpacePartition(cursor, V2.sum(cursor, cellSize), minArea, this.columnsRows, this);
+				this.subpartition.push(nextCell);
+				cursor.x += cellSize.x;
+			}
+			cursor.y += cellSize.y;
+		}
+	}
+
+	draw(ctx, drawElementFunction) {
+		this.aabb.draw(ctx);
+		if (this.subpartition) {
+			for(let i = 0; i < this.subpartition.length; i++) {
+				this.subpartition[i].draw(ctx, drawElementFunction);
+			}
+		}
+		let center = this.aabb.getCenter();
+		//ctx.fillText(""+this.list.length, center.x, center.y);
+		if (drawElementFunction){
+			for (let i = 0; i < this.list.length; ++i) {
+				let element = this.list[i];
+				drawElementFunction(ctx, this, element);
+			}
+		}
+	}
+
+	getPartitions(circle) {
+		if (!this.subpartition) {
+			return [this];
+		}
+		let totalFoundPartitions = undefined;
+		for(let i = 0; i < this.subpartition.length; i++) {
+			let subPartition = this.subpartition[i];
+			if (circle.radius) {
+				if (!subPartition.aabb.intersectsCircle(circle.center, circle.radius)) { continue; }
+			} else {
+				if (!subPartition.aabb.contains(circle.center)) { continue; }
+			}
+			let foundPartitions = subPartition.getPartitions(circle);
+			if (foundPartitions) {
+				if (!totalFoundPartitions) { totalFoundPartitions = []; }
+				totalFoundPartitions = totalFoundPartitions.concat(foundPartitions);
+			}
+		}
+		if (totalFoundPartitions === undefined) {
+			totalFoundPartitions = [this];
+		}
+		return totalFoundPartitions;
+	}
+
+	clearList() {
+		this.list = [];
+		if (this.subpartition) {
+			for(let i = 0; i < this.subpartition.length; i++) {
+				this.subpartition[i].clearList();
+			}
+		}
+	}
+
+	populate(list, convertElementToCircleMethod) {
+		this.clearList();
+		for (let i = 0; i < list.length; ++i) {
+			let element = list[i];
+			let circle = convertElementToCircleMethod(element);
+			let partitions = this.getPartitions(circle);
+			//console.log(element.name+" in "+partitions.length+" partitions: "+partitions[0].aabb);
+			for (let p = 0; p < partitions.length; ++p) {
+				let partition = partitions[p];
+				partition.list.push(element);
+			}
+		}
+	}
+
+	getCollisions(circle, convertElementToCircleMethod) {
+		let partitions = this.getPartitions(circle);
+		//console.log(partitions.length);
+		let collisions = undefined;
+		for (let i = 0; i < partitions.length; ++i) {
+			//console.log(partitions[i].list.length);
+			for (let e = 0; e < partitions[i].list.length; ++e) {
+				let element = partitions[i].list[e];
+				if (!element) { continue; }
+				let otherCircle = convertElementToCircleMethod(element);
+				let targetDistance = otherCircle.radius;
+				if (circle.radius) {
+					targetDistance += circle.radius;
+				}
+				let distance = V2.distance(circle.center, otherCircle.center);
+				if (distance <= targetDistance) {
+					if (!collisions) { collisions = []; }
+					collisions.push(element);
+				}
+			}
+		}
+		return collisions;
+	}
+}
+
+let spacePartition = new SpacePartition(new V2(0,0), new V2(WORLD_WIDTH, WORLD_HEIGHT), WORLD_WIDTH*WORLD_HEIGHT/64, new V2(2,2));
+
+class App {
+	constructor() {
+		this.canvas = document.createElement("canvas");
+		this.now = Date.now();
+		console.log("creating " + this.now);
+		this.then = Date.now();
+		this.targetFps = 30;
+		this.frameDelay = 1000 / this.targetFps;
+		this.mouse = new V2(0,0);
+		this.canvas.width = WORLD_WIDTH;
+		this.canvas.height = WORLD_HEIGHT;
+		this.context = this.canvas.getContext("2d");
+		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+		document.onkeydown = this.userkey;
+	}
+
+	updateKeyInput(e) {
+		const ESCAPE = 27;
+		if (e.keyCode === ESCAPE) {
+			this.clearScreen = true;
+		} else {
+			console.log("key: " + e.keyCode)
+		}
+	};
+
+	updateMousePosition(e) {
+		if (!e) {
+			return;
+		}
+		this.mouse.set(e.clientX, e.clientY);
+	}
+
+	updateMouseDownInput(e) {
+		this.updateMousePosition(e);
+		forEachAgent(a => a.setEndOfLine(this.mouse.x, this.mouse.y));
+	}
+
+	processInput() {
+		if (this.mouse) {
+			forEachAgent(a => a.selectionState = STATE_NONE);
+			forEachAgent(a => {
+				if(a.contains(this.mouse)) {
+					a.selectionState = STATE_HOVERED;
+				}
+			});
+		}
+		if (this.clearScreen) {
+			this.clear();
+			this.clearScreen = false;
+		}
+	}
+
+	drawGame() {
+		this.clear();
+		this.ctx = this.canvas.getContext("2d");
+		// this.ctx.font = "30px Arial";
+		// this.ctx.fillStyle = "#0f0";
+		// this.ctx.textAlign = "center";
+		// this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
+		forEachAgent(a => a.draw(this.ctx));
+		//speechBubble(this.ctx, "this is\na test of text rendering\nwoah\nlol", agents[0].position, agents[1].position, agents[1].strokeColor);
+		if (DRAWMATH) {
+			WIRES.draw(this.ctx);
+			spacePartition.draw(this.ctx, App.drawPartitionReferencingAgent);
+		}
+		if (this.collidingAgents) {
+			for (let i = 0; i < this.collidingAgents.length; ++i) {
+				let a = this.collidingAgents[i];
+				this.ctx.beginPath();
+				this.ctx.arc(a.position.x, a.position.y, a.radius+15, 0, 2 * Math.PI);
+				this.ctx.stroke();
+			}
+		}
+	}
+
+	static drawPartitionReferencingAgent(ctx, partition, agent) {
+		ctx.beginPath();
+		let center = partition.aabb.getCenter();
+		ctx.moveTo(center.x, center.y);
+		ctx.lineTo(agent.position.x, agent.position.y);
+		ctx.stroke();
+	}
+
+	update() {
+		this.updateTiming();
+		spacePartition.populate(agents, Agent.getCircle);
+		let timeHasPassed = this.deltaTime > 0;
+		if (timeHasPassed) { 
+			let deltaTime = this.deltaTime / 1000;
+			forEachAgent(a => a.update(deltaTime));
+			forEachAgent(a => a.updateApplyPhysics(deltaTime));
+			this.enforceCollisionDetection();
+		}
+		this.collidingAgents = spacePartition.getCollisions(new Circle(this.mouse, 20), Agent.getCircle);
+		//console.log(this.collidingAgents);
+		//this.collidingAgents = spacePartition.getPartitions(new Circle(this.mouse, 20));
+	}
+
+	enforceCollisionDetection() {
+		let collisionsPerAgent = {};
+		forEachAgent(a => {
+			if (!a) { return; }
+			let collisions = collisionHappening(a);
+			if (collisions != null) {
+				let collisionsHappeningToAgent = collisionsPerAgent[a.name];
+				if (!collisionsHappeningToAgent) {
+					collisionsHappeningToAgent = [];
+				}
+				for (let i = 0; i < collisions.length; i++) {
+					collisionsHappeningToAgent.push(collisions[i]);
+				}
+				collisionsPerAgent[a.name] = collisionsHappeningToAgent;
+			}
+		});
+		for (let agentname in collisionsPerAgent) {
+			let collisions = collisionsPerAgent[agentname];
+			let collisionAdjustment = new V2(0,0);
+			for(let i = 0; i < collisions.length; i++) {
+				let collision = collisions[i];
+				collisionAdjustment.add(collision.resolution[0]);
+			}
+			collisionAdjustment.div(collisions.length);
+			let agent = collisions[0].agent[0];
+			agent.position.add(collisionAdjustment);
+		}
+	}
+
+	updateTiming() {
+		this.now = Date.now();
+		let deltaTime = this.now - this.then;
+		if (deltaTime) {
+			if (deltaTime > 1000) {
+				deltaTime = 1000;
+			}
+			this.deltaTime = deltaTime;
+		}
+		this.then = this.now;
+	}
+
+	clear() {
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+	}
+};
 
 class Wire {
 	constructor() { }
@@ -530,7 +750,11 @@ class StayInAreaBehavior {
 	}
 }
 
+const STATE_NONE = 0;
+const STATE_HOVERED = 1;
+const STATE_SELECTED = 2;
 class Agent {
+	static getCircle(agent) { return new Circle(agent.position, agent.radius); }
 	constructor(name, position, radius, speed, acceleration, internalClock = 3, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
 		this.name = name;
 		this.position = position;
@@ -542,12 +766,17 @@ class Agent {
 		this.strokeColor = strokeColor;
 		this.fillColor = fillColor;
 		this.borderThickness = borderThickness;
+		this.selectionState = STATE_NONE;
 		// \\this.updateBehavior = (agent,deltaTime) => SeekBehavior.update(agent,deltaTime);
 		this.randomWalkBehavior = new RandomWalkBehavior(this.radius, this.radius*3, internalClock);
-		this.stayInBounds = new StayInAreaBehavior(new V2(), new V2(800,600),
+		this.stayInBounds = new StayInAreaBehavior(new V2(), new V2(WORLD_WIDTH,WORLD_HEIGHT),
 		(agent, deltaTime) => this.randomWalkBehavior.update(agent, deltaTime),
 		() => {
-			this.randomWalkBehavior.pickNextTarget(this);
+			if (!this.stayInBounds.area.contains(this.position)) {
+				this.target = new V2(WORLD_WIDTH/2, WORLD_HEIGHT/2);
+			} else {
+				this.randomWalkBehavior.pickNextTarget(this);
+			}
 		});
 		this.updateBehavior = this._updateBehaviorTree;
 	}
@@ -561,9 +790,20 @@ class Agent {
 			ctx.strokeStyle = this.strokeColor;
 		}
 		ctx.lineWidth = this.borderThickness;
+		if (this.selectionState == STATE_HOVERED || this.selectionState == STATE_SELECTED) {
+			ctx.lineWidth *= 10;
+		}
 		ctx.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI);
 		if (this.fillColor) {
 			ctx.fillStyle = this.fillColor;
+			if (this.fillColor.startsWith('#')) {
+				if (this.selectionState == STATE_HOVERED) {
+					ctx.fillStyle = this.fillColor+"aa";
+				}
+				else if (this.selectionState == STATE_SELECTED) {
+					ctx.fillStyle = this.fillColor+"88";
+				}
+			}
 			ctx.fill();
 		}
 		//ctx.moveTo(this.position.x, this.position.y);
@@ -579,6 +819,10 @@ class Agent {
 			ctx.arc(stopPosition.x, stopPosition.y, this.radius, 0, 2 * Math.PI);
 			ctx.stroke();
 		}
+	}
+
+	contains(point) {
+		return V2.distance(this.position, point) <= this.radius;
 	}
 
 	update(deltaTime) {
@@ -664,9 +908,9 @@ function generateUniqueSillyName(){
 	return sillyName;
 }
 
-for(let i = 0; i < 30; ++i) {
+for(let i = 0; i < 130; ++i) {
 	let sillyName = generateUniqueSillyName();
-	let position = new V2(Math.random()*800, Math.random()*600);
+	let position = new V2(Math.random()*WORLD_WIDTH, Math.random()*WORLD_HEIGHT);
 	let radius = 5 + 15 * Math.random();
 	let speed = 5 + 95 * Math.random();
 	let acceleration = 5 + 95 * Math.random();
@@ -675,7 +919,7 @@ for(let i = 0; i < 30; ++i) {
 	let strokeColor = "#" + Math.floor(Math.random()*16777215).toString(16);
 	let internalClock = 2 + 8 * Math.random();
 	let agent = new Agent(sillyName, position, radius, speed, acceleration, internalClock, mass, fillColor, strokeColor);
-	console.log(sillyName);
+	//console.log(sillyName);
 	agents.push(agent);
 }
 
