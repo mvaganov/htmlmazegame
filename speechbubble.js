@@ -17,21 +17,24 @@ class SpeechBubble {
 		for (let i = bubbles.length - 1; i >= 0; --i) {
 			let bubble = bubbles[i];
 			bubble.update(deltaTime);
-			if (bubble.done) {
-				bubbles.splice(i, 1);
-			}
+			// if (bubble.done) {
+			// 	bubbles.splice(i, 1);
+			// }
 		}
 	}
 
 	static drawSpeechBubbles(ctx, bubbles) {
 		for (let i = 0; i < bubbles.length; ++i) {
 			let bubble = bubbles[i];
+			if (bubble.duration <= 0) {
+				continue;
+			}
 			bubble.draw(ctx);
 		}
 	}
 
 	update(deltaTime) {
-		this.duration -= deltaTIme;
+		this.duration -= deltaTime;
 		if (this.duration <= 0) {
 			this.done = true;
 		}
@@ -40,7 +43,20 @@ class SpeechBubble {
 	draw(ctx) {
 		let speechSource = this.getSourcePointFunc();
 		let center = this.getBubblePointFunc();
-		this.speechBubble(ctx, this.text, center, speechSource, this.lineColor);
+		let alphaDuration = 255;
+		if (this.duration) {
+			if (this.duration <= 0) {
+				return;
+			}
+			alphaDuration = Math.trunc(this.duration*250);
+			if (alphaDuration >= 256) {
+				alphaDuration = 255;
+			} else if (alphaDuration < 0) {
+				alphaDuration = 0;
+			}
+		}
+		let alpha = alphaDuration.toString(16).padStart(2, '0');
+		this.speechBubble(ctx, this.text, center, speechSource, this.lineColor+alpha, '#ffffff'+alpha, '#222222'+alpha);
 	}
 
 	speechBubble(ctx, text, position, speechSource, bubbleLine = '#888', bubbleColor = '#fffa', textColor = '#222') {
@@ -63,7 +79,7 @@ class SpeechBubble {
 			totalRect.y += lineSize.y;
 		}
 		let p = new V2(position);
-		let extraSize = V2.prod(totalRect, 0.125);
+		let extraSize = V2.prod(totalRect, 0.25);
 		totalRect.add(extraSize);
 		ctx.strokeStyle = bubbleLine;
 		ctx.fillStyle = bubbleColor;
@@ -111,17 +127,17 @@ class SpeechBubble {
 
 	calculateOvalWordBubble(center, size, source) {
 		let points = [];
-		let last = circle32.length-1;
-		let x = circle32[last].x * size.x;
-		let y = circle32[last].y * size.y;
-		points.push(new V2(x,y));
+		let last = SpeechBubble.circle32.length-1;
+		let x = SpeechBubble.circle32[last].x * size.x;
+		let y = SpeechBubble.circle32[last].y * size.y;
+		points.push(new V2(x + center.x,y + center.y));
 		let lastPoint = new V2(x,y);
 		let thisPoint = new V2(x,y);
 		let toSource = V2.diff(source, center);
 		let lastSign = V2.sign(toSource, thisPoint) > 0;
 		for(let i = 0; i < 32; ++i) {
-			x = circle32[i].x * size.x;
-			y = circle32[i].y * size.y;
+			x = SpeechBubble.circle32[i].x * size.x;
+			y = SpeechBubble.circle32[i].y * size.y;
 			thisPoint.set(x,y);
 			let thisSign = V2.sign(toSource, thisPoint) > 0;
 			if (lastSign != thisSign && V2.dot(thisPoint, toSource) > 0) {

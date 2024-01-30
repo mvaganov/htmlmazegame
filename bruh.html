@@ -88,6 +88,7 @@ var collisionHappening = function (agent) {
 	if (!collidingAgents || collidingAgents.length == 0) {
 		return null;
 	}
+	let collisionHappening = false;
 	for (let i = 0; i < collidingAgents.length; i++) {
 		let a = collidingAgents[i];
 		if (a == agent) { continue; }
@@ -167,6 +168,13 @@ class App {
 				for (let i = 0; i < hoveredAgents.length; i++) {
 					let a = hoveredAgents[i];
 					a.selectionState = STATE_HOVERED;
+					if (!a.bubble) {
+						let message = a.name.replace(' ', '\n');
+						a.bubble = new SpeechBubble(message, () => a.position, () => V2.sum(a.position, new V2(0,-30)), a.strokeColor, 3);
+						TEXTBUBBLES.push(a.bubble);
+					} else {
+						a.bubble.duration = 3;
+					}
 				}
 			}
 		}
@@ -241,6 +249,7 @@ class App {
 					collisionsHappeningToAgent.push(collisions[i]);
 				}
 				collisionsPerAgent[a.name] = collisionsHappeningToAgent;
+				a.onCollision(collisions);
 			}
 		});
 		for (let agentname in collisionsPerAgent) {
@@ -430,18 +439,32 @@ class RandomWalkBehavior {
 			this.timer = 0;
 		}
 	}
+
+	onCollision(agent, collisionData) {
+		this.pickNextTarget(agent);
+		this.timer = 0;
+	}
 }
 
 class StayInAreaBehavior {
-	constructor(min, max, normalUpdate, oobAction) {
+	constructor(min, max, normalUpdate, oobAction, collisionAction) {
 		this.area = new AABB(min, max);
-		this.updateBehavior = normalUpdate; this.oobAction = oobAction;
+		this.updateBehavior = normalUpdate;
+		this.oobAction = oobAction;
+		this.collisionAction = collisionAction;
 	}
 	update(agent, deltaTime) {
 		if (!agent.target || !this.area.contains(agent.target)) {
 			this.oobAction();
 		} else {
 			this.updateBehavior(agent, deltaTime);
+		}
+	}
+
+	onCollision(agent, collisionData) {
+		console.log(this.collisionAction)
+		if (this.collisionAction) {
+			this.collisionAction(agent, collisionData);
 		}
 	}
 }
@@ -473,11 +496,18 @@ class Agent {
 			} else {
 				this.randomWalkBehavior.pickNextTarget(this);
 			}
+		},
+		(agent, collisions) => {
+			this.randomWalkBehavior.onCollision(this, collisions);
 		});
 		this.updateBehavior = this._updateBehaviorTree;
 	}
 	_updateBehaviorTree(agent, deltaTime) {
 		this.stayInBounds.update(agent, deltaTime);
+	}
+
+	onCollision(collisions) {
+		this.stayInBounds.onCollision(this, collisions);
 	}
 
 	draw(ctx) {
