@@ -137,6 +137,7 @@ class App {
 		this.context = this.canvas.getContext("2d");
 		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
 		document.onkeydown = this.userkey;
+		this.hovered = [];
 	}
 
 	updateKeyInput(e) {
@@ -157,23 +158,35 @@ class App {
 
 	updateMouseDownInput(e) {
 		this.updateMousePosition(e);
-		forEachAgent(a => a.setEndOfLine(this.mouse.x, this.mouse.y));
+		//forEachAgent(a => a.setEndOfLine(this.mouse.x, this.mouse.y));
+		for (let i = 0; i < this.hovered.length; i++) {
+			let a = this.hovered[i];
+			//console.log(a.bubble.duration);
+			if (a.bubble.duration < 3){
+				a.bubble.duration = 3;
+			}
+		}
 	}
 
 	processInput() {
 		if (this.mouse) {
+			this.hovered = [];
 			forEachAgent(a => a.selectionState = STATE_NONE);
 			let hoveredAgents = spacePartition.getCollisions(new Circle(this.mouse), Agent.getCircle);
 			if (hoveredAgents) {
 				for (let i = 0; i < hoveredAgents.length; i++) {
 					let a = hoveredAgents[i];
+					this.hovered.push(a);
 					a.selectionState = STATE_HOVERED;
 					if (!a.bubble) {
 						let message = a.name.replace(' ', '\n');
-						a.bubble = new SpeechBubble(message, () => a.position, () => V2.sum(a.position, new V2(0,-30)), a.strokeColor, 3);
+						a.bubble = new SpeechBubble(message, () => a.position, () => V2.sum(a.position, new V2(0,-30)), a.strokeColor, 1);
 						TEXTBUBBLES.push(a.bubble);
 					} else {
-						a.bubble.duration = 3;
+						if (a.bubble.duration < 1)
+						{
+							a.bubble.duration = 1;
+						}
 					}
 				}
 			}
@@ -201,7 +214,7 @@ class App {
 			for (let i = 0; i < this.collidingAgents.length; ++i) {
 				let a = this.collidingAgents[i];
 				this.ctx.beginPath();
-				this.ctx.arc(a.position.x, a.position.y, a.radius+15, 0, 2 * Math.PI);
+				this.ctx.arc(a.position.x, a.position.y, a.radius * a.influence, 0, 2 * Math.PI);
 				this.ctx.stroke();
 			}
 		}
@@ -421,7 +434,7 @@ class RandomWalkBehavior {
 	pickNextTarget(agent) {
 		let angleRadian = Math.random() * Math.PI * 2;
 		let direction = new V2(Math.cos(angleRadian), Math.sin(angleRadian));
-		let radius = this.radMin;
+		let radius = this.radMin * agent.influence;
 		if (this.radMax !== undefined) {
 			let radDelta = this.radMax - this.radMin;
 			radius = this.radMin + Math.random() * radDelta;
@@ -462,7 +475,7 @@ class StayInAreaBehavior {
 	}
 
 	onCollision(agent, collisionData) {
-		console.log(this.collisionAction)
+		//console.log(this.collisionAction)
 		if (this.collisionAction) {
 			this.collisionAction(agent, collisionData);
 		}
@@ -474,7 +487,7 @@ const STATE_HOVERED = 1;
 const STATE_SELECTED = 2;
 class Agent {
 	static getCircle(agent) { return new Circle(agent.position, agent.radius); }
-	constructor(name, position, radius, speed, acceleration, internalClock = 3, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
+	constructor(name, position, radius, speed, acceleration, internalClock = 3, mass = 1, influence = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
 		this.name = name;
 		this.position = position;
 		this.velocity = new V2(0,0);
@@ -482,6 +495,7 @@ class Agent {
 		this.speed = speed;
 		this.mass = mass;
 		this.acceleration = acceleration;
+		this.influence = influence;
 		this.strokeColor = strokeColor;
 		this.fillColor = fillColor;
 		this.borderThickness = borderThickness;
@@ -524,10 +538,9 @@ class Agent {
 			ctx.fillStyle = this.fillColor;
 			if (this.fillColor.startsWith('#')) {
 				if (this.selectionState == STATE_HOVERED) {
-					ctx.fillStyle = this.fillColor+"aa";
-				}
-				else if (this.selectionState == STATE_SELECTED) {
-					ctx.fillStyle = this.fillColor+"88";
+					ctx.fillStyle = this.fillColor + "aa";
+				} else if (this.selectionState == STATE_SELECTED) {
+					ctx.fillStyle = this.fillColor + "88";
 				}
 			}
 			ctx.fill();
@@ -641,10 +654,11 @@ for(let i = 0; i < 130; ++i) {
 	let speed = 5 + 95 * Math.random();
 	let acceleration = 5 + 95 * Math.random();
 	let mass = 1 + 100 * Math.random();
+	let influence = .5 + 3 * Math.random();
 	let fillColor = "#" + Math.floor(Math.random()*16777215).toString(16);
 	let strokeColor = "#" + Math.floor(Math.random()*16777215).toString(16);
 	let internalClock = 2 + 8 * Math.random();
-	let agent = new Agent(sillyName, position, radius, speed, acceleration, internalClock, mass, fillColor, strokeColor);
+	let agent = new Agent(sillyName, position, radius, speed, acceleration, internalClock, mass, influence, fillColor, strokeColor);
 	//console.log(sillyName);
 	agents.push(agent);
 }
