@@ -162,8 +162,16 @@ class App {
 		for (let i = 0; i < this.hovered.length; i++) {
 			let a = this.hovered[i];
 			//console.log(a.bubble.duration);
-			if (a.bubble.duration < 3){
-				a.bubble.duration = 3;
+			if (a.bubble.duration < 3) {
+				a.bubble.duration = 10;
+				if (!a.jokeDataStream) {
+					a.jokeDataStream = createSillyWordArray(25);
+					a.jokeText = compileSillyWordArrayToText(a.jokeDataStream);
+					a.bubble.text = a.jokeText;
+					let angleRadian = Math.random() * Math.PI * 2;
+					let delta = new V2(Math.cos(angleRadian) * 150, Math.sin(angleRadian) * 70);
+					a.bubble.getBubblePointFunc = () => V2.sum(a.position, delta);
+				}
 			}
 		}
 	}
@@ -180,7 +188,9 @@ class App {
 					a.selectionState = STATE_HOVERED;
 					if (!a.bubble) {
 						let message = a.name.replace(' ', '\n');
-						a.bubble = new SpeechBubble(message, () => a.position, () => V2.sum(a.position, new V2(0,-30)), a.strokeColor, 1);
+						let angleRadian = Math.random() * Math.PI * 2;
+						let delta = new V2(Math.cos(angleRadian) * 50, Math.sin(angleRadian) * 30);
+						a.bubble = new SpeechBubble(message, () => a.position, () => V2.sum(a.position, delta), a.strokeColor, 1);
 						TEXTBUBBLES.push(a.bubble);
 					} else {
 						if (a.bubble.duration < 1)
@@ -629,6 +639,7 @@ agents = [
 
 const SILLY_NAMES = ["bitty","bore","bug","bum", "dinq", "fuzz", "goo", "gum", "hick", "pea", "shoo", "slug", "sniff", "stink", "trash", "worm", "zoo", "fig", "chew", "beanie", "mad", "egg", "wee", "lick", "fart", "buzz", "fluff", "poop", "barf", "rat", "bobo", "booger", "fudge", "doozy", "hippy", "jiggy", "dink", "oink", "roach", "snot", "sock", "toot", "pie", "wiggle", "spotty", "hobo", "woof", "noodle", "droopy", "pants", "moo", "buns", "kins", "face", "ball", "rider", "worth", "ton"];
 function getRandomInt(max) { return Math.floor(Math.random() * max); }
+function getRandomChoice(choices) { return choices[getRandomInt(choices.length)]; }
 function randomNameBit() {
 	return SILLY_NAMES[getRandomInt(SILLY_NAMES.length)];
 }
@@ -645,6 +656,57 @@ function generateUniqueSillyName(){
 	} while (agentDictionary[sillyName] !== undefined);
 	agentDictionary[sillyName] = 1;
 	return sillyName;
+}
+
+function createSillyWordArray(segmentCount) {
+	let array = [];
+	for (let i = 0; i < segmentCount; i++) {
+		array[i] = getRandomInt(SILLY_NAMES.length);
+	}
+	let index = 0;
+	while(index < array.length) {
+		let segmentCountForWord = 1 + getRandomInt(2);
+		index += segmentCountForWord;
+		if (index < array.length) {
+			array.splice(index, 0, -1);
+			++index;
+		}
+	}
+	return array;
+}
+
+function compileSillyWordArrayToText(sillyWordArray) {
+	let text = "";
+	let needForPause = 0;
+	let minIdeasPerPause = 3;
+	let maxIdeasPerPause = 5;
+	let ideaCountDelta = maxIdeasPerPause - minIdeasPerPause;
+	for(let i=0; i < sillyWordArray.length; i++) {
+		let wordIndex = sillyWordArray[i];
+		if (wordIndex >= 0) {
+			let wordSegment = SILLY_NAMES[wordIndex];
+			text += wordSegment;
+			if (i+1 >= sillyWordArray.length) {
+				text += getRandomChoice(['!','.','?']);
+			}
+		} else {
+			let ideaWeight = 1 / (minIdeasPerPause + getRandomInt(ideaCountDelta));
+			needForPause += ideaWeight;
+			if (needForPause >= 1) {
+				//console.log(needForPause-1 + " vs " + (1/maxIdeasPerPause));
+				if (needForPause-1 > (1/maxIdeasPerPause)) {
+					text += "!";
+				} else {
+					text += getRandomChoice([',','.','?']);
+				}
+				text += "\n";
+				needForPause = 0;
+			} else {
+				text += " ";
+			}
+		}
+	}
+	return text;
 }
 
 for(let i = 0; i < 130; ++i) {
