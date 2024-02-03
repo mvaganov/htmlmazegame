@@ -114,12 +114,8 @@ function mainLoop() {
 	APP.processInput();
 	APP.update();
 	APP.drawGame();
-	// TODO implement logic that queries the average framerate over the last 10 frames. then every 10 frames,
-		// if the frame rate is too low, decrease the target framedelay by one
-		// if the frame rate is too high, increase the target framedelay by one
 	setTimeout(mainLoop, APP.frameDelay);
 }
-
 
 let spacePartition = new SpacePartition(new V2(0,0), new V2(WORLD_WIDTH, WORLD_HEIGHT), WORLD_WIDTH*WORLD_HEIGHT/64, new V2(2,2));
 
@@ -138,6 +134,31 @@ class App {
 		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
 		document.onkeydown = this.userkey;
 		this.hovered = [];
+		this.__delays = Array.apply(null, {length: 10}).map(Number.call, () => TARGET_FPS);
+		this.__delaysIndex = 0;
+	}
+	var 
+	__avgDelay() {
+		let num = 0;
+		for(let i = 0; i < this.__delays.length; i++) {
+			num += this.__delays[i];
+		}
+		num /= this.__delays.length;
+		return num;
+	}
+
+	__updateFrameDelayToMaintainFPS(targetFps) {
+		targetFps += 0.5;
+		if (this.__delaysIndex >= this.__delays.length) {
+			this.__delaysIndex = 0;
+			let actualFps = 1000/this.__avgDelay();
+			if (actualFps < targetFps) {
+				this.frameDelay--;
+			} else if (actualFps > targetFps) {
+				this.frameDelay++;
+			}
+		}
+		this.__delays[this.__delaysIndex++] = this.deltaTime;
 	}
 
 	updateKeyInput(e) {
@@ -254,6 +275,7 @@ class App {
 			SpeechBubble.updateSpeechBubbles(deltaTime,TEXTBUBBLES);
 		}
 		this.collidingAgents = spacePartition.getCollisions(new Circle(this.mouse, 20), Agent.getCircle);
+		this.__updateFrameDelayToMaintainFPS(TARGET_FPS);
 		//console.log(this.collidingAgents);
 		//this.collidingAgents = spacePartition.getPartitions(new Circle(this.mouse, 20));
 	}
