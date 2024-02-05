@@ -602,6 +602,7 @@ agents = [
 	// new Agent("gray", new V2(40,300), 8, 100, 50),
 ];
 
+(function generateAgents() {
 for(let i = 0; i < 130; ++i) {
 	let sillyName = generateUniqueSillyName();
 	let position = new V2(Math.random()*WORLD_WIDTH, Math.random()*WORLD_HEIGHT);
@@ -617,6 +618,7 @@ for(let i = 0; i < 130; ++i) {
 	//console.log(sillyName);
 	agents.push(agent);
 }
+})();
 
 function mouseMoveInterrupt(e) {
 	APP.updateMousePosition(e || window.event);
