@@ -11,18 +11,13 @@
 		<script src="circle.js" type="text/javascript"></script>
 		<script src="spacepartition.js" type="text/javascript"></script>
 		<script src="wires.js" type="text/javascript"></script>
-		<script src="speechbubble.js" type="text/javascript"></script>
-		<script src="sillywords.js" type="text/javascript"></script>
 		<script>
 const WORLD_WIDTH = 800;
 const WORLD_HEIGHT = 600;
 const TARGET_FPS = 30;
 let DRAWMATH = false;
 var APP;
-var TEXTBUBBLES = [];
 var agents;
-var getPlayer = () => agents[0];
-var drawList = [];
 
 var collisionHappening = function (agent) {
 	let listOfCollisions = null;
@@ -34,7 +29,8 @@ var collisionHappening = function (agent) {
 	let collisionHappening = false;
 	for (let i = 0; i < collidingAgents.length; i++) {
 		let a = collidingAgents[i];
-		if (a == agent) { continue; }
+		let agentCollidingWithSelf = a == agent;
+		if (agentCollidingWithSelf) { continue; }
 		let collisionData = Agent.computePenetration(agent, a);
 		if (collisionData != null) {
 			if (listOfCollisions == null) {
@@ -66,7 +62,6 @@ class App {
 	constructor() {
 		this.canvas = document.createElement("canvas");
 		this.now = Date.now();
-		console.log("creating " + this.now);
 		this.then = Date.now();
 		this.targetFps = TARGET_FPS;
 		this.frameDelay = 1000 / this.targetFps;
@@ -123,21 +118,8 @@ class App {
 
 	updateMouseDownInput(e) {
 		this.updateMousePosition(e);
-		//forEachAgent(a => a.setEndOfLine(this.mouse.x, this.mouse.y));
 		for (let i = 0; i < this.hovered.length; i++) {
 			let a = this.hovered[i];
-			//console.log(a.bubble.duration);
-			if (a.bubble.duration < 3) {
-				a.bubble.duration = 10;
-				if (!a.jokeDataStream) {
-					a.jokeDataStream = createSillyWordArray(25);
-					a.jokeText = compileSillyWordArrayToText(a.jokeDataStream);
-					a.bubble.text = a.jokeText;
-					let angleRadian = Math.random() * Math.PI * 2;
-					let delta = new V2(Math.cos(angleRadian) * 150, Math.sin(angleRadian) * 70);
-					a.bubble.getBubblePointFunc = () => V2.sum(a.position, delta);
-				}
-			}
 		}
 	}
 
@@ -155,8 +137,6 @@ class App {
 						let message = a.name.replace(' ', '\n');
 						let angleRadian = Math.random() * Math.PI * 2;
 						let delta = new V2(Math.cos(angleRadian) * 50, Math.sin(angleRadian) * 30);
-						a.bubble = new SpeechBubble(message, () => a.position, () => V2.sum(a.position, delta), a.strokeColor, 1);
-						TEXTBUBBLES.push(a.bubble);
 					} else {
 						if (a.bubble.duration < 1)
 						{
@@ -175,12 +155,7 @@ class App {
 	drawGame() {
 		this.clear();
 		this.ctx = this.canvas.getContext("2d");
-		// this.ctx.font = "30px Arial";
-		// this.ctx.fillStyle = "#0f0";
-		// this.ctx.textAlign = "center";
-		// this.ctx.fillText("Hello World!", this.canvas.width / 2, this.canvas.height / 2);
 		forEachAgent(a => a.draw(this.ctx));
-		//speechBubble(this.ctx, "this is\na test of text rendering\nwoah\nlol", agents[0].position, agents[1].position, agents[1].strokeColor);
 		if (DRAWMATH) {
 			WIRES.draw(this.ctx);
 			spacePartition.draw(this.ctx, App.drawPartitionReferencingAgent);
@@ -193,7 +168,10 @@ class App {
 				this.ctx.stroke();
 			}
 		}
-		SpeechBubble.drawSpeechBubbles(this.ctx, TEXTBUBBLES);
+		this.drawFpsText();
+	}
+
+	drawFpsText() {
 		this.ctx.fillStyle = "#222";
 		this.ctx.textAlign = "left";
 		let fpsValue = Math.floor((this.actualFps !== undefined)? this.actualFps : (1000/this.deltaTime));
@@ -217,12 +195,9 @@ class App {
 			forEachAgent(a => a.update(deltaTime));
 			forEachAgent(a => a.updateApplyPhysics(deltaTime));
 			this.enforceCollisionDetection();
-			SpeechBubble.updateSpeechBubbles(deltaTime,TEXTBUBBLES);
 		}
 		this.collidingAgents = spacePartition.getCollisions(new Circle(this.mouse, 20), Agent.getCircle);
 		this.__updateFrameDelayToMaintainFPS(TARGET_FPS);
-		//console.log(this.collidingAgents);
-		//this.collidingAgents = spacePartition.getPartitions(new Circle(this.mouse, 20));
 	}
 
 	enforceCollisionDetection() {
@@ -249,7 +224,7 @@ class App {
 				let collision = collisions[i];
 				collisionAdjustment.add(collision.resolution[0]);
 			}
-			collisionAdjustment.div(collisions.length);
+			//collisionAdjustment.div(collisions.length);
 			let agent = collisions[0].agent[0];
 			agent.position.add(collisionAdjustment);
 		}
@@ -284,24 +259,19 @@ class BasicBehavior {
 			let distance = delta.magnitude();
 			if (distance < agent.radius) {
 				agent.velocity = new V2(0,0);
+				return true;
 			} else {
 				let direction = V2.quotient(delta, distance);
 				agent.velocity = V2.prod(direction, agent.speed);
 			}
+		} else {
+			agent.velocity = V2.zero;
 		}
+		return false;
 	}
 }
 
 class SeekBehavior {
-	constructor(onArrival) {
-		this.onArrival = onArrival;
-	}
-	//execute(agent, deltaTime) {
-	//	let finished = update(agent, deltaTime);
-	//	if (this.onArrival && finished) {
-	//		this.onArrival();
-	//	}
-	//}
 	static update (agent, deltaTime) {
 		if (!agent.target) { return false; }
 		//console.log(agent.target, agent.position);
@@ -329,7 +299,7 @@ class SeekBehavior {
 		if (useStopLogic) {
 			let amountOfSpeedToStop = currentSpeed;
 			if (agent.targetEndingSpeed) {
-				amountOfSpeedToStop - agent.targetEndingSpeed;
+				amountOfSpeedToStop = agent.targetEndingSpeed;
 			}
 			let brakeDistance = amountOfSpeedToStop * amountOfSpeedToStop / (2 * agent.acceleration);
 			let stoppingVector = V2.prod(velocityDirection, brakeDistance);
@@ -423,8 +393,10 @@ class RandomWalkBehavior {
 
 	update(agent, deltaTime) {
 		this.timer += deltaTime;
-		//agent.targetEndingSpeed = 1; // TODO why do they not move when this is uncommented?
-		if (this.timer >= this.timeout || SeekBehavior.update(agent, deltaTime)) {
+		agent.targetEndingSpeed = 0;
+		if (this.timer >= this.timeout || 
+		//BasicBehavior.update(agent, deltaTime)) {
+		SeekBehavior.update(agent, deltaTime)) {
 			this.pickNextTarget(agent);
 			this.timer = 0;
 		}
@@ -606,7 +578,7 @@ agents = [
 
 (function generateAgents() {
 for(let i = 0; i < 130; ++i) {
-	let sillyName = generateUniqueSillyName();
+	let name = "agent"+i;
 	let position = new V2(Math.random()*WORLD_WIDTH, Math.random()*WORLD_HEIGHT);
 	let radius = 5 + 15 * Math.random();
 	let speed = 5 + 95 * Math.random();
@@ -616,8 +588,7 @@ for(let i = 0; i < 130; ++i) {
 	let fillColor = "#" + Math.floor(Math.random()*16777215).toString(16);
 	let strokeColor = "#" + Math.floor(Math.random()*16777215).toString(16);
 	let internalClock = 2 + 8 * Math.random();
-	let agent = new Agent(sillyName, position, radius, speed, acceleration, internalClock, mass, influence, fillColor, strokeColor);
-	//console.log(sillyName);
+	let agent = new Agent(name, position, radius, speed, acceleration, internalClock, mass, influence, fillColor, strokeColor);
 	agents.push(agent);
 }
 })();

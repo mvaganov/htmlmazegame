@@ -9,6 +9,7 @@ class V2 {
 		}
 		this.assert();
 	}
+	static zero = new V2();
 	isZero() { return this.x === 0 && this.y === 0; }
 	assert() { if (this.x === undefined || this.y === undefined) { throw new Error("undefined values! " + this.toString()); } }
 	set(x,y) { this.x = x; this.y = y; this.assert(); return this; }
