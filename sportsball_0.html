@@ -151,7 +151,7 @@ class App {
 class Agent {
 	static getCircle(agent) { return new Circle(agent.position, agent.radius); }
 
-	constructor(name, position, radius, speed, acceleration, internalClock = 3, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
+	constructor(name, position, radius, speed, acceleration, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
 		this.name = name;
 		this.position = position;
 		this.velocity = new V2(0,0);
@@ -294,8 +294,7 @@ function randomColor() { return "#" + Math.floor(Math.random()*16777215).toStrin
 		let mass = 1 + 100 * Math.random();
 		let fillColor = randomColor();
 		let strokeColor = randomColor();
-		let internalClock = 2 + 8 * Math.random();
-		let agent = new Agent(name, position, radius, speed, acceleration, internalClock, mass, fillColor, strokeColor);
+		let agent = new Agent(name, position, radius, speed, acceleration, mass, fillColor, strokeColor);
 		agents.push(agent);
 	}
 })();
