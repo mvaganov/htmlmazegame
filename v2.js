@@ -12,7 +12,10 @@ class V2 {
 	static zero = new V2();
 	isZero() { return this.x === 0 && this.y === 0; }
 	assert() { if (this.x === undefined || this.y === undefined) { throw new Error("undefined values! " + this.toString()); } }
-	set(x,y) { this.x = x; this.y = y; this.assert(); return this; }
+	set(x,y) {
+		if (typeof x === "object" && y === undefined) { this.x = x.x; this.y = x.y; }
+		else { this.x = x; this.y = y; this.assert(); return this; }
+	}
 	copy(v) { this.x = v.x; this.y = v.y; this.assert(); return this; }
 	add(v) { this.x += v.x; this.y += v.y; this.assert(); return this; }
 	sub(v) { this.x -= v.x; this.y -= v.y; this.assert(); return this; }
