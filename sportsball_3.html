@@ -1,0 +1,448 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+	<style>
+		body { margin:0; padding:0; }
+	</style>
+	</head>
+	<body onmousemove="mouseMoveInterrupt()" onkeydown="keyDownInterrupt()" onmousedown="mouseDownInterrupt()" onmouseup="mouseUpInterrupt()" onload="startGame()">
+		<script src="v2.js" type="text/javascript"></script>
+		<script src="circle.js" type="text/javascript"></script>
+		<script>
+const WORLD_WIDTH = 800, WORLD_HEIGHT = 600, TARGET_FPS = 30;
+var APP;
+var agents = [];
+var notSelectableAgents = [];
+var selectedAgent = null;
+var TheBall = null;
+
+function mouseMoveInterrupt(e) {
+	APP.updateMousePosition(e || window.event);
+}
+
+function keyDownInterrupt(e) {
+	APP.updateKeyInput(e || window.event);
+}
+
+function mouseDownInterrupt(e) {
+	APP.updateMouseDownInput(e || window.event);
+}
+
+function mouseUpInterrupt(e) {
+	APP.mouseUpInterrupt(e || window.event);
+}
+
+function startGame() {
+	APP = new App();
+	mainLoop();
+}
+
+function mainLoop() {
+	APP.drawGame();
+	APP.processInput();
+	APP.update();
+	setTimeout(mainLoop, APP.frameDelay);
+}
+
+class App {
+	constructor() {
+		this.canvas = document.createElement("canvas");
+		this.now = Date.now();
+		this.then = Date.now();
+		this.targetFps = TARGET_FPS;
+		this.frameDelay = 1000 / this.targetFps;
+		this.deltaTime = this.frameDelay / 1000;
+		this.mouse = new V2(0,0);
+		this.canvas.width = WORLD_WIDTH;
+		this.canvas.height = WORLD_HEIGHT;
+		this.context = this.canvas.getContext("2d");
+		document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+		document.onkeydown = this.userkey;
+		this.mouseHeldCounter = 0;
+		this.paused = false;
+	}
+
+	updateMousePosition(e) {
+		if (!e) {
+			return;
+		}
+		this.mouse.set(e.clientX, e.clientY);
+		if (selectedAgent == TheBall.whoIsHoldingMe && this.mouseHeldCounter) {
+			if (this.isMouseClickedNearSelectedAgent()) {
+				TheBall.position.set(this.mouse);
+			}
+		}
+	}
+
+	distanceBetweenMouseAndSelectedAgent() {
+		let delta = V2.diff(this.mouse, selectedAgent.position);
+		let distance = delta.magnitude();
+		return distance;
+	}
+
+	isMouseClickedNearSelectedAgent() {
+		let distance = this.distanceBetweenMouseAndSelectedAgent();
+		let maxDist = minHoldDistance(selectedAgent, TheBall);
+		return distance < maxDist;
+	}
+
+	updateKeyInput(e) {
+		const ESCAPE = 27;
+		if (e.keyCode === ESCAPE) {
+			console.log("escape was pressed!");
+			this.paused = !this.paused;
+		} else {
+			console.log("key: " + e.keyCode)
+		}
+	}
+
+	mouseUpInterrupt(e) {
+		--this.mouseHeldCounter;
+		if (!this.isMouseClickedNearSelectedAgent()) {
+			let holdingTheBall = TheBall.whoIsHoldingMe == selectedAgent;
+			if (holdingTheBall) {
+				this.launchBall(V2.diff(this.mouse, TheBall.position));
+			}
+		}
+	}
+
+	updateMouseDownInput(e) {
+		++this.mouseHeldCounter;
+		this.updateMousePosition(e);
+		if (this.mouse) {
+			let selectedAgents = findAgentsOverlapping(new Circle(this.mouse, 1));
+			let holdingTheBall = TheBall.whoIsHoldingMe == selectedAgent;
+			if (!holdingTheBall && selectedAgents != null && selectedAgents.length > 0) {
+				selectedAgent.velocity.set(0,0);
+				let clickedOn = selectedAgents[0];
+				if (notSelectableAgents.indexOf(clickedOn) < 0) {
+					selectedAgent = clickedOn;
+				}
+			}
+		}
+	}
+
+	launchBall(delta) {
+		let ball = TheBall;
+		if (ball == null) {
+			return;
+		}
+		let distance = delta.magnitude();
+		let direction = V2.quotient(delta, distance);
+		const throwSpeed = 100;
+		let newVelocity = V2.prod(direction, throwSpeed);
+		ballDisconnect(selectedAgent);
+		ball.velocity.set(newVelocity);
+	}
+
+	drawGame() {
+		this.clear();
+		this.ctx = this.canvas.getContext("2d");
+		forEachAgent(a => a.draw(this.ctx));
+	}
+
+	processInput() {
+		if (this.mouse) {
+			let player = selectedAgent;
+			let playerDelta = V2.diff(this.mouse, player.position);
+			let desiredVelocity = playerDelta;
+			let magnitude = playerDelta.magnitude();
+			let maxSpeed = player.speed;
+			let direction = V2.quotient(playerDelta, magnitude);
+			let currentSpeed = player.velocity.magnitude();
+			if (magnitude > maxSpeed) {
+				desiredVelocity = V2.prod(direction, maxSpeed);
+			}
+			const useAccelerationForce = false;
+			if (useAccelerationForce) {
+				let endOfVelocityLine = V2.sum(player.position, player.velocity);
+				this.drawLine(player.position, endOfVelocityLine, "blue");
+				this.drawLine(player.position, V2.sum(player.position, desiredVelocity), "green");
+				let differenceInVelocities = V2.diff(desiredVelocity, player.velocity);
+				let steeringDirection = differenceInVelocities.normalized();
+				this.drawLine(endOfVelocityLine, V2.sum(endOfVelocityLine, V2.prod(steeringDirection, player.acceleration)), "magenta");
+				let accelerationThisFrame = V2.prod(steeringDirection, player.acceleration * this.deltaTime);
+				player.velocity.add(accelerationThisFrame);
+			} else {
+				player.velocity.set(desiredVelocity);
+			}
+		}
+	}
+
+	drawLine(a, b, color) {
+		if (!this.ctx) {
+			return;
+		}
+		this.ctx.lineWidth = 1;
+		this.ctx.beginPath();
+		this.ctx.moveTo(a.x, a.y);
+		this.ctx.lineTo(b.x, b.y);
+		if (color) {
+			this.ctx.strokeStyle = color;
+		}
+		this.ctx.stroke();
+	}
+
+	update() {
+		this.updateTiming();
+		let timeHasPassed = this.deltaTime > 0;
+		if (timeHasPassed) {
+			forEachAgent(a => a.update(this.deltaTime));
+			forEachAgent(a => a.updateApplyPhysics(this.deltaTime));
+			enforceCollisionDetectionForAllAgents();
+		}
+	}
+
+	updateTiming() {
+		this.now = Date.now();
+		let deltaTimeMs = this.now - this.then;
+		if (this.paused) {
+			this.deltaTime = 0;
+		} else if (deltaTimeMs) {
+			if (deltaTimeMs > 1000) {
+				deltaTimeMs = 1000;
+			}
+			this.deltaTime = deltaTimeMs / 1000;
+		}
+		this.then = this.now;
+	}
+
+	clear() {
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+	}
+};
+
+class Agent {
+	static getCircle(agent) { return new Circle(agent.position, agent.radius); }
+
+	constructor(name, position, radius, speed, acceleration, mass = 1, fillColor = 'gray', strokeColor = 'black', borderThickness = 0.25) {
+		this.name = name;
+		this.position = position;
+		this.velocity = new V2(0,0);
+		this.radius = radius;
+		this.speed = speed;
+		this.mass = mass;
+		this.acceleration = acceleration;
+		this.strokeColor = strokeColor;
+		this.fillColor = fillColor;
+		this.borderThickness = borderThickness;
+	}
+
+	draw(ctx) {
+		ctx.beginPath();
+		if (this.strokeColor) {
+			ctx.strokeStyle = this.strokeColor;
+		}
+		ctx.lineWidth = this.borderThickness;
+		ctx.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI);
+		if (this.fillColor) {
+			ctx.fillStyle = this.fillColor;
+			ctx.fill();
+		}
+		ctx.stroke();
+	}
+
+	update(deltaTime) {
+		if (this.specialLogic) {
+			this.specialLogic(this);
+		}
+		this.updateApplyPhysics(deltaTime);
+	}
+
+	updateApplyPhysics(deltaTime) {
+		if (this.velocity) {
+			let movedThisFrame = V2.prod(this.velocity, deltaTime);
+			this.position.add(movedThisFrame);
+		}
+	}
+
+	static computePenetration(agent0, agent1) {
+		let sumRadius = agent0.radius + agent1.radius;
+		let delta = V2.diff(agent1.position, agent0.position);
+		let distance = delta.magnitude();
+		if (sumRadius > distance) {
+			let overlap = sumRadius - distance;
+			let direction = V2.quotient(delta, distance);
+			let totalMass = agent0.mass + agent1.mass;
+			let offset0 = -overlap*agent1.mass/totalMass;
+			let offset1 = overlap*agent0.mass/totalMass;
+			let resolution0 = V2.prod(direction, offset0);
+			let resolution1 = V2.prod(direction, offset1);
+			let collisionData = {
+				agent: [ agent0, agent1 ],
+				position: [ agent0.position, agent1.position ],
+				resolution: [ resolution0, resolution1 ]
+			};
+			return collisionData;
+		}
+		return null;
+	}
+};
+
+function enforceCollisionDetectionForAllAgents() {
+	let collisionsPerAgent = {};
+	forEachAgent(a => {
+		if (!a) { return; }
+		let collisions = getCollisionsHappeningToAgent(a);
+		if (collisions != null) {
+			let collisionsHappeningToAgent = collisionsPerAgent[a.name];
+			if (!collisionsHappeningToAgent) {
+				collisionsHappeningToAgent = [];
+			}
+			for (let i = 0; i < collisions.length; i++) {
+				collisionsHappeningToAgent.push(collisions[i]);
+			}
+			collisionsPerAgent[a.name] = collisionsHappeningToAgent;
+		}
+	});
+	for (let agentname in collisionsPerAgent) {
+		let collisions = collisionsPerAgent[agentname];
+		let collisionAdjustment = new V2(0,0);
+		for(let i = 0; i < collisions.length; i++) {
+			let collision = collisions[i];
+			collisionAdjustment.add(collision.resolution[0]);
+		}
+		let firstCollision = collisions[0];
+		let agent = firstCollision.agent[0];
+		agent.position.add(collisionAdjustment);
+		if (agent != TheBall) {
+			let otherAgent = firstCollision.agent[1];
+			if (otherAgent == TheBall)
+			{
+				if (agent.whoIsHoldingMe){
+					ballDisconnect(agent.whoIsHoldingMe);
+				}
+				TheBall.whoIsHoldingMe = agent;
+			}
+		}
+	}
+}
+
+function ballDisconnect(agent) {
+	TheBall.velocity.set(0,0);
+	TheBall.whoIsHoldingMe = null;
+}
+
+function forEachAgent(whatToDo) {
+	for (let i = 0; i < agents.length; i++) {
+		whatToDo(agents[i]);
+	}
+}
+
+function getCollisionsHappeningToAgent(agent) {
+	let listOfCollisions = null;
+	let agentCircle = Agent.getCircle(agent);
+	let collidingAgents = findAgentsOverlapping(agentCircle);
+	if (!collidingAgents || collidingAgents.length == 0) {
+		return null;
+	}
+	for (let i = 0; i < collidingAgents.length; i++) {
+		let collidingAgent = collidingAgents[i];
+		let agentCollidingWithSelf = collidingAgent == agent;
+		if (agentCollidingWithSelf) { continue; }
+		let collisionData = Agent.computePenetration(agent, collidingAgent);
+		if (collisionData != null) {
+			if (listOfCollisions == null) {
+				listOfCollisions = [collisionData];
+			} else {
+				listOfCollisions.push(collisionData);
+			}
+		}
+	}
+	return listOfCollisions;
+}
+
+function findAgentsOverlapping(circle) {
+	let collisions = [];
+	for(let i = 0; i < agents.length; i++) {
+		let agent = agents[i];
+		let distance = V2.distance(circle.center, agent.position);
+		let minDistance = circle.radius + agent.radius;
+		if (distance < minDistance) {
+			collisions.push(agent);
+		}
+	}
+	return collisions;
+}
+
+function randomColor() { return "#" + Math.floor(Math.random()*16777215).toString(16); }
+
+(function generateAgents() {
+	makeTeam("flamingkittens", new V2(100,100), "#f00");
+	makeTeam("frostyotters", new V2(WORLD_WIDTH-100,WORLD_HEIGHT-100), "#08a");
+	selectedAgent = agents[0];
+	TheBall =  new Agent("ball", new V2(WORLD_WIDTH/2,WORLD_HEIGHT/2), 20, 0, 0, 1, "#fff", "#000");
+	GoalA =  new Agent("goal A", new V2(WORLD_WIDTH-50,WORLD_HEIGHT-50), 20, 0, 0, 1000, "#fff", "#800");
+	GoalB =  new Agent("goal B", new V2(50,50), 20, 0, 0, 1000, "#fff", "#048");
+	GoalA.startPosition = new V2(GoalA.position);
+	GoalB.startPosition = new V2(GoalB.position);
+	notSelectableAgents.push(GoalA);
+	notSelectableAgents.push(GoalB);
+	notSelectableAgents.push(TheBall);
+	agents.push(GoalA);
+	agents.push(GoalB);
+	agents.push(TheBall);
+	GoalA.specialLogic = stayPut;
+	GoalB.specialLogic = stayPut;
+	TheBall.specialLogic = ballLogic;
+})();
+
+function stayPut(goal){
+	goal.position.set(goal.startPosition);
+}
+
+function maxHoldDistance(agent, ball) { return ball.radius + agent.radius * 3; }
+function minHoldDistance(agent, ball) { return ball.radius + agent.radius; }
+
+function ballLogic(ball) {
+	ball.fillColor = randomColor();
+	let agent = ball.whoIsHoldingMe;
+	if (agent) {
+		ball.velocity.set(agent.velocity);
+		let minDistance = minHoldDistance(agent, ball);
+		let maxDistance = maxHoldDistance(agent, ball);
+		let desiredDistance = (minDistance + maxDistance) / 2;
+		let delta = V2.diff(ball.position, agent.position);
+		let distance = delta.magnitude();
+		if (distance > maxDistance) {
+			ballDisconnect(ball);
+		} else if (distance != desiredDistance) {
+			let direction = V2.quotient(delta, distance);
+			let desiredLocation = V2.sum(V2.prod(direction, desiredDistance), agent.position);
+			let deltaFromDesired = V2.diff(desiredLocation, ball.position);
+			ball.velocity.add(deltaFromDesired);
+		}
+		APP.drawLine(agent.position, ball.position, ball.fillColor);
+		//APP.drawLine(agent.position, ball.position, ball.fillColor);
+	}
+	let outOfBounds = false;
+	if (ball.position.x < 0) { ball.position.x = 0; outOfBounds = true; }
+	if (ball.position.y < 0) { ball.position.y = 0; outOfBounds = true; }
+	if (ball.position.x > WORLD_WIDTH) { ball.position.x = WORLD_WIDTH; outOfBounds = true; }
+	if (ball.position.y > WORLD_HEIGHT) { ball.position.y = WORLD_HEIGHT; outOfBounds = true; }
+	if (outOfBounds) {
+		ball.velocity.set(0,0);
+	}
+}
+
+function makeTeam(teamName, startPosition, teamColor) {
+	var teamPositions = ["point guard", "shooting guard", "power forward", "small forward", "center"];
+	const maxradiusdistance = 100;
+	const half = maxradiusdistance/2;
+	for(let i = 0; i < teamPositions.length; ++i) {
+		let name = teamName + " " + teamPositions[i];
+		let position = V2.sum(startPosition, new V2(Math.random()*maxradiusdistance-half, Math.random()*maxradiusdistance-half));
+		let radius = 5 + 15 * Math.random();
+		let speed = 5 + 95 * Math.random();
+		let acceleration = 5 + 95 * Math.random();
+		let mass = 1 + 100 * Math.random();
+		let fillColor = teamColor;
+		let strokeColor = randomColor();
+		let agent = new Agent(name, position, radius, speed, acceleration, mass, fillColor, strokeColor);
+		agents.push(agent);
+	}
+}
+		</script>
+	</body>
+</html>
